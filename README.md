@@ -361,7 +361,6 @@ python ../../../src/.py ./train_eval_infer_aug.config
 <h3>
 References
 </h3>
-<h2>References</h2>
 <b>1. PanNuke: An Open Pan-Cancer Histology Dataset for Nuclei Instance Segmentation and Classification</b><br>
 Gamper, Jevgenij and Koohbanani, Navid Alemi and Benet, Ksenija and Khuram, Ali and Rajpoot, Nasir<br>
 <a href="https://academictorrents.com/details/99f2c7b57b95500711e33f2ee4d14c9fd7c7366c">
