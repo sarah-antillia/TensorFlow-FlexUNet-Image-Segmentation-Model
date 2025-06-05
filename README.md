@@ -295,7 +295,7 @@ Please move to a <b>./projects/TensorFlowFlexUNet/PanNuke</b> folder<br>
 </pre>
 This simply runs the following command.
 <pre>
-python ../../../src/.py ./train_eval_infer_aug.config
+python ../../../src/TensorFlowFlexUNetInferencer.py ./train_eval_infer_aug.config
 </pre>
 <hr>
 <b>mini_test_images</b><br>
