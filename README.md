@@ -3,9 +3,7 @@
 This is the first experiment of Image Segmentation for PanNuke 
  based on 
 our <a href="./src/TensorFlowFlexUNet.py">TensorFlowFlexUNet</a>
- (<b>TensorFlow Flexible UNet Image Segmentation Model for Multiclass</b>)
-
-and a PNG and NPZ <a href="https://drive.google.com/file/d/1CxG_7CyIBiVqbf0kiNQJtMi3vvqJwTLi/view?usp=sharing">
+ (<b>TensorFlow Flexible UNet Image Segmentation Model for Multiclass</b>) and a PNG and NPZ <a href="https://drive.google.com/file/d/1CxG_7CyIBiVqbf0kiNQJtMi3vvqJwTLi/view?usp=sharing">
 PanNuke-Mini-ImageMask-Dataset-With-Categorize-Masks.zip</a>, which was derived by us from the 
 <a href="https://www.kaggle.com/datasets/andrewmvd/cancer-inst-segmentation-and-classification">
 Cancer Instance Segmentation and Classification 1
@@ -270,7 +268,7 @@ and run the following bat file to evaluate TensorFlowUNet model for PanNuke.<br>
 </pre>
 This bat file simply runs the following command.
 <pre>
-python ../../../src/TensorFlowUNetEvaluator.py ./train_eval_infer_aug.config
+python ../../../src/TensorFlowFlexUNetEvaluator.py ./train_eval_infer_aug.config
 </pre>
 
 Evaluation console output:<br>
@@ -297,7 +295,7 @@ Please move to a <b>./projects/TensorFlowFlexUNet/PanNuke</b> folder<br>
 </pre>
 This simply runs the following command.
 <pre>
-python ../../../src/TensorFlowUNetInferencer.py ./train_eval_infer_aug.config
+python ../../../src/.py ./train_eval_infer_aug.config
 </pre>
 <hr>
 <b>mini_test_images</b><br>
