@@ -124,8 +124,8 @@ PanNuke-Mini-ImageMask-Dataset-With-Categorize-Masks.zip</a>.
         └─masks
 </pre>
 <br>
-Please rename  <i>cmasks</i> in <i>test</i>, <i>test</i> and <i>valid</i> folders to <i>categporize_masks</i><br>
-
+Please rename <b>categporize_masks</b> in <b>test</b>, <b>train</b> and <b>valid</b> folders
+in the downloaded dataset to <b>cmasks</b>.<br>
 On the derivation of this dataset, please refer to 
 <a href="https://github.com/sarah-antillia/RGBMask-To-CategorizedMask-Conversion-Tool">
 RGBMask-To-CategorizedMask-Conversion-Tool</a>.
