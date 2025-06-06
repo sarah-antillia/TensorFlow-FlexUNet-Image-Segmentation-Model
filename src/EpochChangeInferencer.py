@@ -32,12 +32,12 @@ from ConfigParser import ConfigParser
 
 class EpochChangeInferencer(tf.keras.callbacks.Callback):
 
-  def __init__(self, xmodel, config_file):
-    self.xmodel = xmodel
+  def __init__(self, flexmodel, config_file):
+    self.flexmodel = flexmodel
  
     self.config = ConfigParser(config_file) 
-    self.image_width = self.config.get(ConfigParser.INFER,   "image_width")
-    self.image_height = self.config.get(ConfigParser.TRAIN,  "image_height")
+    #self.image_width = self.config.get(ConfigParser.INFER,   "image_width")
+    #self.image_height = self.config.get(ConfigParser.TRAIN,  "image_height")
 
     self.images_dir = self.config.get(ConfigParser.INFER,  "images_dir")
     self.output_dir = self.config.get(ConfigParser.TRAIN,  "epoch_change_infer_dir", dvalue="./epoch_change_infer")
@@ -75,7 +75,7 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs):
     for image_file in self.image_files:
       #print("--- on eoch_change end {}".format(image_file))
-      predicted = self.xmodel.predict(image_file)
+      predicted = self.flexmodel.predict(image_file)
       basename = os.path.basename(image_file)
       filename = basename
       filename = "Epoch_" +str(epoch+1) + "_" + basename

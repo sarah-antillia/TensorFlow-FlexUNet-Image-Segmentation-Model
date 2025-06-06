@@ -156,21 +156,13 @@ class TensorFlowFlexModel:
               loss    = self.loss,
               metrics = self.metrics)
 
-    
+  # 2025/06/06: Fixed a bug.
   def create_callbacks(self):
     callbacks  = []
-
     check_point_callback     = tf.keras.callbacks.ModelCheckpoint(self.weight_filepath, verbose=1, 
                                      save_best_only    = True,
                                      save_weights_only = False)
     callbacks.append(check_point_callback)
-
-    # Patience to EarlyStopping callback.    
-    patience = self.config.get(ConfigParser.TRAIN, "patience", dvalue=10)
-    if patience > 0:
-      early_stopping_callback = tf.keras.callbacks.EarlyStopping(patience=patience, verbose=1)
-      print("--- Added earlyStopping callback patience {}".format(patience))
-      callbacks.append(early_stopping_callback)
 
     enable_reducer = self.config.get(ConfigParser.TRAIN, "learning_rate_reducer", dvalue=False)
     if enable_reducer:
@@ -192,9 +184,21 @@ class TensorFlowFlexModel:
     epoch_change_callback   = EpochChangeCallback(eval_dir, self.train_metrics)
     callbacks.append(epoch_change_callback)
 
+    # Patience to EarlyStopping callback.    
+    # 2025/06/06 Moved here.
+    patience = self.config.get(ConfigParser.TRAIN, "patience", dvalue=10)
+    if patience > 0:
+      early_stopping_callback = tf.keras.callbacks.EarlyStopping(patience=patience, verbose=1)
+      print("--- Added earlyStopping callback patience {}".format(patience))
+      callbacks.append(early_stopping_callback)
+
     print("--- Callbacks {}".format(callbacks))
     return callbacks
 
+  def train(self):
+    print("==== train")
+    self.batch_size = self.config.get(ConfigParser.TRAIN, "batch_size")
+  
   def train(self):
     eval_dir       = self.config.get(ConfigParser.TRAIN, "eval_dir", dvalue="./eval")
     if not os.path.exists(eval_dir):
