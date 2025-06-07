@@ -1,5 +1,8 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/06)</h2>
-
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/08)</h2>
+<li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
+and retrained PanNuke segmetation model.</li> 
+<li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
+<br>
 This is the first experiment of Image Segmentation for PanNuke 
  based on 
 our <a href="./src/TensorFlowFlexUNet.py">TensorFlowFlexUNet</a>
@@ -124,7 +127,7 @@ PanNuke-Mini-ImageMask-Dataset-With-Categorize-Masks.zip</a>.
         └─masks
 </pre>
 <br>
-Please rename <b>categporize_masks</b> in <b>test</b>, <b>train</b> and <b>valid</b> folders
+Please rename <b>categorized_masks</b> in <b>test</b>, <b>train</b> and <b>valid</b> folders
 in the downloaded dataset to <b>cmasks</b>.<br>
 On the derivation of this dataset, please refer to 
 <a href="https://github.com/sarah-antillia/RGBMask-To-CategorizedMask-Conversion-Tool">
@@ -167,6 +170,7 @@ Defined a small <b>base_filters = 16 </b> and large <b>base_kernels = (9,9)</b> 
 and a large num_layers (including a bridge between Encoder and Decoder Blocks).
 <pre>
 [model]
+;You may specify your own UNet class derived from our TensorFlowFlexModel
 model         = "TensorFlowFlexUNet"
 generator     =  False
 image_width    = 512
@@ -178,13 +182,13 @@ base_filters   = 16
 base_kernels   = (9,9)
 num_layers     = 8
 dropout_rate   = 0.05
-dilation       = (3,3)
+dilation       = (1,1)
 </pre>
 <b>Learning rate</b><br>
 Defined a small learning rate.  
 <pre>
 [model]
-learning_rate  = 0.0001
+learning_rate  = 0.00007
 </pre>
 <b>Loss and metrics functions</b><br>
 Specified "categorical_crossentropy" and <a href="./src/dice_coef_multiclass.py">"dice_coef_multiclass"</a>.<br>
@@ -222,7 +226,7 @@ rgb color map dict for PanNuke 6 classes.<br>
 [mask]
 mask_file_format = ".npz"
 ;PanNuke rgb color map dict for 6 classes.
-rgb_map = {(0, 0, 0):0,(  0, 255,   0):1, (255,   0,   0):2, (0, 0, 255):3, (255, 255,   0):4,(  0, 255, 255):5,}
+rgb_map = {(0,0,0):0,(0,255,0):1,(255,0,0):2,(0,0,255):3,(255,255,0):4,(0,255,255):5,}
 </pre>
 
 <b>Epoch change inference callback</b><br>
@@ -245,8 +249,8 @@ By using this callback, on every epoch_change, the inference procedure can be ca
 <img src="./projects/TensorFlowFlexUNet/PanNuke/asset/epoch_change_infer_at_end.png" width="1024" height="auto"><br>
 <br>
 
-In this experiment, the training process was terminated at epoch 50.<br><br>
-<img src="./projects/TensorFlowFlexUNet/PanNuke/asset/train_console_output_at_epoch50.png" width="920" height="auto"><br>
+In this experiment, the training process was stopped at epoch 47 by EarlyStopping callback.<br><br>
+<img src="./projects/TensorFlowFlexUNet/PanNuke/asset/train_console_output_at_epoch47.png" width="920" height="auto"><br>
 <br>
 
 <a href="./projects/TensorFlowFlexUNet/PanNuke/eval/train_metrics.csv">train_metrics.csv</a><br>
@@ -261,7 +265,7 @@ In this experiment, the training process was terminated at epoch 50.<br><br>
 <h3>
 4 Evaluation
 </h3>
-Please move to a <b>./projects/TensorFlowFlexUNet/PanNuke</b> folder,<br>
+Please move to <b>./projects/TensorFlowFlexUNet/PanNuke</b> folder,<br>
 and run the following bat file to evaluate TensorFlowUNet model for PanNuke.<br>
 <pre>
 ./2.evaluate.bat
@@ -272,7 +276,7 @@ python ../../../src/TensorFlowFlexUNetEvaluator.py ./train_eval_infer_aug.config
 </pre>
 
 Evaluation console output:<br>
-<img src="./projects/TensorFlowFlexUNet/PanNuke/asset/evaluate_console_output_at_epoch50.png" width="920" height="auto">
+<img src="./projects/TensorFlowFlexUNet/PanNuke/asset/evaluate_console_output_at_epoch47.png" width="920" height="auto">
 <br><br>Image-Segmentation-PanNuke
 
 <a href="./projects/TensorFlowFlexUNet/PanNuke/evaluation.csv">evaluation.csv</a><br>
@@ -280,8 +284,8 @@ The loss (categorical_crossentropy) to this PanNuke/test was not so low and dice
 was relatively high as shown below.
 <br>
 <pre>
-categorical_crossentropy,0.1805
-dice_coef_multiclass,0.9076
+categorical_crossentropy,0.1973
+dice_coef_multiclass,0.9033
 </pre>
 <br>
 

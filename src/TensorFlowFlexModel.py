@@ -30,11 +30,13 @@ from tensorflow.keras import layers
 import numpy as np
 import matplotlib.pyplot as plt
 from  tensorflow.keras.losses import SparseCategoricalCrossentropy
+from  tensorflow.keras.metrics import SparseCategoricalAccuracy 
+
 from EpochChangeCallback import EpochChangeCallback
 from EpochChangeInferencer import EpochChangeInferencer
 from ImageCategorizedMaskDataset import ImageCategorizedMaskDataset
 
-from dice_coef_multiclass import dice_coef_multiclass
+from dice_coef_multiclass import dice_coef_multiclass, dice_loss_multiclass
 import json
 import traceback
 from PIL import Image
@@ -54,7 +56,7 @@ class TensorFlowFlexModel:
     self.config_file    = config_file
     self.config         = ConfigParser(config_file)
     self.seed           = self.SEED
-
+    self.verbose        = self.config.get(ConfigParser.DEBUG, "verbose")
     self.image_height   = self.config.get(ConfigParser.MODEL, "image_height")
     self.image_width    = self.config.get(ConfigParser.MODEL, "image_width")
     self.image_channels = self.config.get(ConfigParser.MODEL, "image_channels")
@@ -69,13 +71,15 @@ class TensorFlowFlexModel:
     self.train_images_dir = self.config.get(ConfigParser.TRAIN, "images_dir")
     self.train_masks_dir  = self.config.get(ConfigParser.TRAIN, "masks_dir" ) 
 
-
+    print("--- self.train.images {}".format(self.train_images_dir) )
+    print("--- self.train.masks  {}".format(self.train_masks_dir) )
+      
     self.valid_images_dir = self.config.get(ConfigParser.VALID, "images_dir")
     self.valid_masks_dir  = self.config.get(ConfigParser.VALID, "masks_dir" ) 
                                             
       
     Dataset     = eval(self.config.get(ConfigParser.DATASET, "class_name", dvalue="ImageCategorizedMaskDataset"))
-    self.dataset = Dataset(config_file)
+    self.dataset = Dataset(config_file, verbose=self.verbose)
     print("--- Dataset class {}".format(self.dataset))
 
     self.mini_test_dir    = self.config.get(ConfigParser.INFER, "images_dir")
@@ -86,9 +90,14 @@ class TensorFlowFlexModel:
       #shutil.rmtree(self.mini_test_output_dir)
       os.makedirs(self.mini_test_output_dir)
 
+    # 205/06/07
+    # Default mask_datatype = "categorized",   mask_file_format = ".npz"
+    # You may specify mask_datatype="indexed", mask_file_format = ".png"
+    self.mask_datatype = self.config.get(ConfigParser.MASK, "mask_datatype", dvalue = "categorized")
+
     # Specify multi-class rgb color map dict as shown below
-    sample_rgb_map  = {(0, 0, 0):0, (  0, 255,   0):1,  (255,   0,   0):2,  (0, 0, 255):3, }
-    self.rgb_map =self.config.get(ConfigParser.MASK, "rgb_map", dvalue = sample_rgb_map)
+    sample_rgb_map = {(0, 0, 0):0, (  0, 255,   0):1,  (255,   0,   0):2,  (0, 0, 255):3, }
+    self.rgb_map   = self.config.get(ConfigParser.MASK, "rgb_map", dvalue = sample_rgb_map)
     print("--- rgb_map {}".format(self.rgb_map))
    
     # Create a flattened palette from rgb_map
@@ -115,7 +124,10 @@ class TensorFlowFlexModel:
     
     self.compile_model()
 
-  # Please define your own create_model methon in a subclass
+    self.model.loaded = False
+
+
+  # Please define your own create_model method in a subclass
   def create_model(self):
     #raise Exception("Error: Not implemented yet")
     return None 
@@ -142,7 +154,7 @@ class TensorFlowFlexModel:
          clipvalue = clipvalue,)
       print("--- Optimizer AdamW learning_rate {} clipvalue {} ".format(learning_rate, clipvalue))
 
-    # Specify a list of metrics name, which can be use to compile a UNet model. 
+    # Specify a list of metrics name, which can be used to compile a UNet model. 
     metrics  = self.config.get(ConfigParser.MODEL, "metrics", dvalue=["dice_coef_multiclass"])
    
     self.metrics = []
@@ -299,15 +311,14 @@ class TensorFlowFlexModel:
 
 
   def load_model(self) :
-    self.model.loaded = False
 
     if os.path.exists(self.weight_filepath):
       if self.model == None:
         raise Exception("Not found model")
-      
-      self.model.load_weights(self.weight_filepath)
-      print("=== Loaded a weight_file {}".format(self.weight_filepath))
-      self.model.loaded = True
+      if self.model.loaded == False:
+        self.model.load_weights(self.weight_filepath)
+        print("=== Loaded a weight_file {}".format(self.weight_filepath))
+        self.model.loaded = True
 
     else:
       error = "Not found a weight_file " + self.weight_filepath

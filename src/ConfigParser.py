@@ -27,6 +27,7 @@ import traceback
 
 class ConfigParser:
   # settion names of a ini file.
+  DEBUG       = "debug"
   DATASET     = "dataset"
   DATASETCLASS = "datasetclass"
   EVAL        = "eval"

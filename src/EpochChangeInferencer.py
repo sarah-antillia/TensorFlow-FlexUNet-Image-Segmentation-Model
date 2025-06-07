@@ -34,11 +34,8 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
 
   def __init__(self, flexmodel, config_file):
     self.flexmodel = flexmodel
- 
-    self.config = ConfigParser(config_file) 
-    #self.image_width = self.config.get(ConfigParser.INFER,   "image_width")
-    #self.image_height = self.config.get(ConfigParser.TRAIN,  "image_height")
 
+    self.config = ConfigParser(config_file) 
     self.images_dir = self.config.get(ConfigParser.INFER,  "images_dir")
     self.output_dir = self.config.get(ConfigParser.TRAIN,  "epoch_change_infer_dir", dvalue="./epoch_change_infer")
     if os.path.exists(self.output_dir):
@@ -47,7 +44,7 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
 
     self.num_infer_images = self.config.get(ConfigParser.TRAIN, "num_infer_images", dvalue=6)
     self.color_order = self.config.get(ConfigParser.MODEL,  "color_order", dvalue="RGB")
-    sample_rgb_map  = {(0, 0, 0):0, (  0, 255,   0):1,  (255,   0,   0):2,  (0, 0, 255):3, }
+    sample_rgb_map   = {(0, 0, 0):0, (  0, 255,   0):1,  (255,   0,   0):2,  (0, 0, 255):3, }
     self.rgb_map =self.config.get(ConfigParser.MASK, "rgb_map", dvalue=sample_rgb_map)
     print("--- rgb_map {}".format(self.rgb_map))
    
