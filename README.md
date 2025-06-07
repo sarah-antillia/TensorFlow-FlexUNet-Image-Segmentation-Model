@@ -181,14 +181,14 @@ num_classes    = 6
 base_filters   = 16
 base_kernels   = (9,9)
 num_layers     = 8
-dropout_rate   = 0.05
-dilation       = (1,1)
+dropout_rate   = 0.04
+dilation       = (3,3)
 </pre>
 <b>Learning rate</b><br>
 Defined a small learning rate.  
 <pre>
 [model]
-learning_rate  = 0.00007
+learning_rate  = 0.00008
 </pre>
 <b>Loss and metrics functions</b><br>
 Specified "categorical_crossentropy" and <a href="./src/dice_coef_multiclass.py">"dice_coef_multiclass"</a>.<br>
