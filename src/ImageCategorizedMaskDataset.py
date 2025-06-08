@@ -87,14 +87,14 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
     Y = np.zeros((num_images, self.image_height, self.image_width, self.num_classes, ), 
                  dtype=self.mask_dtype)
 
-    for n, image_file in tqdm(enumerate(image_files), total=len(image_files)):  
+    for n, image_file in enumerate(image_files):  
       img = cv2.imread(image_file)  
       if self.color_order == "RGB":
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
       img = cv2.resize(img, (self.image_width, self.image_height))
       X[n] = img
 
-    for n, mask_file in tqdm(enumerate(mask_files), total=len(mask_file)):
+    for n, mask_file in enumerate(mask_files):
       if mask_file.endswith(".npz"):
         data = np.load(mask_file)
         mask = data['mask']
