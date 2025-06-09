@@ -285,9 +285,9 @@ class TensorFlowFlexModel:
       predicted_rgb_mask = self.predict(image_file)
       basename = os.path.basename(image_file)
       #2025/06/10
-      name     = basename.split(".")[0]
-      filename = name + ".png"
-      output_filepath = os.path.join(self.mini_test_output_dir, filename)
+      if basename.endswith(".jpg"):
+        basename = basename.replace(".jpg", ".png")
+      output_filepath = os.path.join(self.mini_test_output_dir, basename)
       basename = os.path.basename(image_file)
     
       predicted_rgb_mask.save(output_filepath)
