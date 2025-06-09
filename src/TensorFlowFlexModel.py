@@ -284,8 +284,12 @@ class TensorFlowFlexModel:
     for image_file in image_files:
       predicted_rgb_mask = self.predict(image_file)
       basename = os.path.basename(image_file)
-      output_filepath = os.path.join(self.mini_test_output_dir, basename)
-
+      #2025/06/10
+      name     = basename.split(".")[0]
+      filename = name + ".png"
+      output_filepath = os.path.join(self.mini_test_output_dir, filename)
+      basename = os.path.basename(image_file)
+    
       predicted_rgb_mask.save(output_filepath)
       print("=== Saved prediction {}".format(output_filepath))
 

@@ -1,8 +1,9 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/09)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/10)</h2>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
 and retrained PanNuke segmetation model.</li> 
 <li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
 <li>2025/06/09: Updated <a href="./src/EpochChangeInferencer.py">EpochChangeInferencer</a> to support JPG input files. </li>
+<li>2025/06/10: Updated <a href="./src/TensorFlowFlexModel.py">TensorFlowFlexModel</a> to support JPG input files. </li>
 <br>
 This is the first experiment of Image Segmentation for PanNuke 
  based on 
