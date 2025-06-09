@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/08)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/09)</h2>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
 and retrained PanNuke segmetation model.</li> 
 <li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
@@ -246,7 +246,7 @@ By using this callback, on every epoch_change, the inference procedure can be ca
 <b>Epoch_change_inference output at starting (epoch 1,2,3)</b><br>
 <img src="./projects/TensorFlowFlexUNet/PanNuke/asset/epoch_change_infer_at_start.png" width="1024" height="auto"><br>
 <br>
-<b>Epoch_change_inference output at ending (epoch 48,49,50)</b><br>
+<b>Epoch_change_inference output at ending (epoch 45,46,47)</b><br>
 <img src="./projects/TensorFlowFlexUNet/PanNuke/asset/epoch_change_infer_at_end.png" width="1024" height="auto"><br>
 <br>
 
