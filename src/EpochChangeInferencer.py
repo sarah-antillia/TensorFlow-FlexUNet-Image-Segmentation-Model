@@ -74,8 +74,13 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
       #print("--- on eoch_change end {}".format(image_file))
       predicted = self.flexmodel.predict(image_file)
       basename = os.path.basename(image_file)
+      
+      # 2025/06/09 Added the following 2 lines.
+      if basename.endswith(".jpg"):
+         basename = basename.replace(".jpg", ".png")
       filename = basename
       filename = "Epoch_" +str(epoch+1) + "_" + basename
       output_filepath = os.path.join(self.output_dir, filename)
+  
       predicted.save(output_filepath)
       #print("Saved prediction {}".format(output_filepath))
