@@ -53,6 +53,7 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
     self.palette = []
     for item in self.rgb_map:
       self.palette += list(item)
+    print("--- palette {}".format(self.palette))
 
   def create(self, images_dir, masks_dir ):
     print("ImageCategorizedMaskDataset images_dir {} masks_dir {}".format(images_dir, masks_dir))
@@ -109,6 +110,8 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
     if self.verbose:
        width, height = rgb_mask.size
        print("--rgb_mask_file {} image width {} height {}".format(rgb_mask_file, width, height))
+    #2025/07/03 Added the following line
+    rgb_mask = rgb_mask.resize((self.image_width, self.image_height))
 
     rgb_mask_array   = np.array(rgb_mask)
     indexed_array = np.argmin(np.sum((rgb_mask_array - self.rgb_array)**2, axis=-1), axis=0)
@@ -136,3 +139,21 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
       print("Shape of categorized_mask:", categorized_mask.shape)
     return categorized_mask
     
+
+  def to_categorized_mask(self, rgb_mask_array):
+    indexed_array = np.argmin(np.sum((rgb_mask_array - self.rgb_array)**2, axis=-1), axis=0)
+
+    # Create PIL image
+    indexed_mask = Image.fromarray(indexed_array.astype(np.uint8), mode="P")
+    if self.verbose:
+      print("to_to_categorized_mask palette {}".format(self.palette))
+    indexed_mask.putpalette(self.palette)
+    indexed_array = np.array(indexed_mask)
+    if self.verbose:
+      print("to_to_categorized_mask palette num_classes {}".format(self.num_classes))
+    # from tensorflow.keras.utils import to_categorical
+    # 2. Create a categorized mask (numpy array) from an indexed mask
+    categorized_mask = to_categorical(indexed_array, num_classes=self.num_classes)
+    if self.verbose:
+      print("Shape of categorized_mask:", categorized_mask.shape)
+    return categorized_mask

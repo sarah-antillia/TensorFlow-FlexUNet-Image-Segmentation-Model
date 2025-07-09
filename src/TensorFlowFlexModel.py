@@ -15,6 +15,7 @@
 # TensorFlowFlexModel.py
 
 # 2025/06/05 T.Arai
+# 2025/06/15 Modified to support an online augmentation.
 
 import os
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
@@ -35,6 +36,7 @@ from  tensorflow.keras.metrics import SparseCategoricalAccuracy
 from EpochChangeCallback import EpochChangeCallback
 from EpochChangeInferencer import EpochChangeInferencer
 from ImageCategorizedMaskDataset import ImageCategorizedMaskDataset
+from ImageCategorizedMaskDatasetGenerator import ImageCategorizedMaskDatasetGenerator
 
 from dice_coef_multiclass import dice_coef_multiclass, dice_loss_multiclass
 import json
@@ -64,6 +66,10 @@ class TensorFlowFlexModel:
     self.num_classes    = self.config.get(ConfigParser.MODEL, "num_classes")
     self.color_order    = self.config.get(ConfigParser.IMAGE,  "color_order", dvalue="RGB")
     
+    self.num_layers     = self.config.get(ConfigParser.MODEL, "num_layers", dvalue=6)
+    self.base_filters   = self.config.get(ConfigParser.MODEL,  "base_filters", dvalue=16)
+    
+
     #Multi-class NumPy NPZ (multi-class categorized mask file format) 
     numpy_npz = ".npz"
     self.mask_file_format = self.config.get(ConfigParser.MASK,  "mask_file_format", dvalue=numpy_npz)
@@ -86,9 +92,9 @@ class TensorFlowFlexModel:
 
     self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir")
 
-    if not os.path.exists(self.mini_test_output_dir):
-      #shutil.rmtree(self.mini_test_output_dir)
-      os.makedirs(self.mini_test_output_dir)
+    if os.path.exists(self.mini_test_output_dir):
+      shutil.rmtree(self.mini_test_output_dir)
+    os.makedirs(self.mini_test_output_dir)
 
     # 205/06/07
     # Default mask_datatype = "categorized",   mask_file_format = ".npz"
@@ -110,7 +116,6 @@ class TensorFlowFlexModel:
 
     model_dir       = self.config.get(ConfigParser.TRAIN, "model_dir", dvalue="./models")
     if not os.path.exists(model_dir):
-      #shutil.rmtree(model_dir)
       os.makedirs(model_dir)
 
     self.weight_filepath = os.path.join(model_dir, self.BEST_MODEL_FILE)
@@ -208,35 +213,71 @@ class TensorFlowFlexModel:
     return callbacks
 
   def train(self):
-    print("==== train")
-    self.batch_size = self.config.get(ConfigParser.TRAIN, "batch_size")
-  
-  def train(self):
+    print("==== Started TensorFlowFlexModel.train")  
     eval_dir       = self.config.get(ConfigParser.TRAIN, "eval_dir", dvalue="./eval")
+    #
     if not os.path.exists(eval_dir):
-      #shutil.rmtree(eval_dir)
       os.makedirs(eval_dir)
 
-    X_train, Y_train = self.dataset.create(self.train_images_dir, self.train_masks_dir)
-    X_valid, Y_valid = self.dataset.create(self.valid_images_dir, self.valid_masks_dir)
- 
-    print("=== Train data shape:", X_train.shape, Y_train.shape)
-    print("=== Valid data shape:", X_valid.shape, Y_valid.shape)
-
-    callbacks = self.create_callbacks()
-
+    self.callbacks = self.create_callbacks()
     self.batch_size = self.config.get(ConfigParser.TRAIN, "batch_size", dvalue=4)
     self.epochs     = self.config.get(ConfigParser.TRAIN, "epochs",     dvalue=100)
 
-    history = self.model.fit(X_train, Y_train,
-                    validation_data =(X_valid, Y_valid),
-                    callbacks       = callbacks,
-                    batch_size     = self.batch_size,
-                    epochs         = self.epochs,
-                    verbose        = 1)
+    # Check generator (online_augmentation) flag
+    generator = self.config.get(ConfigParser.MODEL, "generator", dvalue=False)
+    #
+    # 2025/06/15 Modified to suppor on line augmentation
+    history  = None 
+    if generator == False:
+
+      X_train, Y_train = self.dataset.create(self.train_images_dir, self.train_masks_dir)
+      X_valid, Y_valid = self.dataset.create(self.valid_images_dir, self.valid_masks_dir)
+ 
+      print("=== Train data shape:", X_train.shape, Y_train.shape)
+      print("=== Valid data shape:", X_valid.shape, Y_valid.shape)
+      history = self.model.fit(X_train, Y_train,
+                    validation_data = (X_valid, Y_valid),
+                    callbacks       = self.callbacks,
+                    batch_size      = self.batch_size,
+                    epochs          = self.epochs,
+                    verbose         = 1)
+
+    else:
+      # 2025/06/15 
+      # On line augumentation
+      # Create two  ImageCategorizedMaskDatasetGenerator for TRAIN and EVAL datasets.
+      print("----train by generator")
+      train_gen = ImageCategorizedMaskDatasetGenerator(self.config_file, dataset=ConfigParser.TRAIN)
+      train_generator = train_gen.generate()
+      valid_gen = ImageCategorizedMaskDatasetGenerator(self.config_file, dataset=ConfigParser.VALID)
+      valid_generator = valid_gen.generate()
+
+      history = self.train_by_generator(train_generator, valid_generator)
+
     self.save_history(history)
 
+  # 2025/06/15
+  def train_by_generator(self, train_generator, valid_generator):
+    print("=== Start train_by_generator")
+    print("--- Use the train and valid generator to fit.")
+    # train and valid dataset will be used by train_generator and valid_generator respectively
+    steps_per_epoch  = self.config.get(ConfigParser.TRAIN, "steps_per_epoch",  dvalue=400)
+    validation_steps = self.config.get(ConfigParser.TRAIN, "validation_steps", dvalue=800)
+  
+    history = self.model.fit(train_generator, 
+                    steps_per_epoch = steps_per_epoch,
+                    epochs          = self.epochs, 
+                    validation_data = valid_generator,
+                    validation_steps= validation_steps,
+                    shuffle         = False,
+                    callbacks       = self.callbacks,
+                    verbose         = 1)
+    return history
+  
+
   def save_history(self, history): 
+    if history == None:
+      return
     jstring = str(history.history)
     with open(self.HISTORY_JSON, 'wt') as f:
       json.dump(jstring, f, ensure_ascii=False,  indent=4, sort_keys=True, separators=(',', ': '))

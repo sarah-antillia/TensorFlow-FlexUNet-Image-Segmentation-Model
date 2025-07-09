@@ -109,6 +109,7 @@ class EpochChangeCallback(tf.keras.callbacks.Callback):
   def save_eval_graphs(self):
     self.lineGraph.plot(self.train_losses_file)
     self.lineGraph.plot(self.train_accuracies_file)
+    
   # 2024/08/10
   def terminate(self):
     break_training = "./break_training"

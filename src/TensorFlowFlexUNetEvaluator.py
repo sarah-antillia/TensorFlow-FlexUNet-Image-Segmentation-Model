@@ -25,7 +25,20 @@ import traceback
 
 from ConfigParser import ConfigParser
 
-from TensorFlowFlexUNet import TensorFlowFlexUNet
+# 205/07/09 Added the following classes.
+
+from TensorFlowFlexUNet          import TensorFlowFlexUNet
+from TensorFlowFlexAttentionUNet import TensorFlowFlexAttentionUNet
+from TensorFlowFlexDeepLabV3Plus import TensorFlowFlexDeepLabV3Plus
+
+from TensorFlowFlexSwinUNet      import TensorFlowFlexSwinUNet
+from TensorflowFlexEfficientNetB7UNet import TensorFlowFlexEfficientNetB7UNet
+from TensorflowFlexEfficientUNet import TensorFlowFlexEfficientUNet
+from TensorFlowFlexMultiResUNet  import TensorFlowFlexMultiResUNet
+from TensorFlowFlexSharpUNet     import TensorFlowFlexSharpUNet
+from TensorFlowFlexU2Net         import TensorFlowFlexU2Net
+from TensorFlowFlexUNet3Plus     import TensorFlowFlexUNet3Plus
+from TensorFlowFlexTransUNet     import TensorFlowFlexTransUNet
 
 if __name__ == "__main__":
   try:

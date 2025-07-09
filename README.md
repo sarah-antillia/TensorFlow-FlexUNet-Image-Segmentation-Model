@@ -1,10 +1,75 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/06/10)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/07/10)</h2>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
 and retrained PanNuke segmetation model.</li> 
 <li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
 <li>2025/06/09: Updated <a href="./src/EpochChangeInferencer.py">EpochChangeInferencer</a> to support JPG input files. </li>
 <li>2025/06/10: Updated <a href="./src/TensorFlowFlexModel.py">TensorFlowFlexModel</a> to support JPG input files. </li>
+<li>2025/07/10: Added various TensorFlowFlexUNet models, 
+<a href="./src/TensorFlowFlexAttentionUNet.py">TensorFlowFlexAttentionUNet</a>,
+<a href="./src/TensorFlowFlexSwinUNet.py">TensorFlowFlexSwinUNet</a>,
+and so on. </li>
+
 <br>
+<h2>
+<a id="1">
+1 TensorFlowFlexUNet Image Segmentation Model
+</a>
+</h2>
+We implemented a set of various <b>TensorFlow Image Segmentation UNet Models for MultiClass</b>, which contains
+ the following classes derived from <b><a href="./src/TensorFowFlexUNet.py">TensorFlowFlexUNet</a>.</b>
+<br><br>
+<b> TensorFlow UNet Class Hierarchy </b><br>
+<pre>
+<a href="./src/TensorFlowFlexModel.py">TensorFlowFlexModel</a>
+ └─<a href="./src/TensorFowFlexUNet.py">TensorFlowFlexUNet</a>
+    ├─ <na href="./src/TesorFlowFlexAttentionUNet.py">TensorFlowFlexAttentionUNet</a>
+    ├─ <a href="./src/TensorFlowFlexDeepLabV3Plus.py">TensorFlowFlexDeepLabV3Plus</a>
+    ├─ <a href="./src/TensorFlowFlexEfficientNetB7UNet.py">TensorFlowFlexEfficientNetB7UNet</a>
+    ├─ <a href="./src/TensorFlowFlexEfficientUNet.py">TensorFlowFlexEfficientUNet</a>
+    ├─ <a href="./src/TensorFlowFlexMultiResUNet.py">TensorFlowFlexMultiResUNet</a>
+    ├─ <a href="./src/TensorFlowFlexSharpUNet.py">TensorFlowFlexSharpUNet</a>
+    ├─ <a href="./src/TensorFlowFlexSwinUNet.py">TensorFlowFlexSwinUNet</a>
+    ├─ <a href="./src/TensorFlowFlexTransUNet.py">TensorFlowFlexTransUNet</a>
+    ├─ <a href="./src/TensorFlowFlexUNet3Plus.py">TensorFlowFlexUNet3Plus</a>
+    └─ <a href="./src/TensorFlowFlexU2Net.py">TensorFlowFlexU2Net</a>
+</pre>
+  
+<br>
+We appreciate all contributors of these various UNet base implementations on the following github repositories.<br>
+
+<a href="https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture/blob/main/TensorFlow/attention-unet.py">
+https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture: attention-unet.py</a><br>
+
+<a href="https://github.com/TanyaChutani/DeepLabV3Plus-Tf2.x/blob/master/notebook/DeepLab_V3_Plus.ipynb">
+https://github.com/TanyaChutani/DeepLabV3Plus-Tf2.x: DeepLab_V3_Plus.ipynb</a><br>
+
+<a href="https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture/blob/main/TensorFlow/multiresunet.py">
+https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture: multiresunet.py</a><br>
+
+<a href="https://github.com/hasibzunair/sharp-unets/blob/master/demo.ipynb">
+https://github.com/hasibzunair/sharp-unets: demo.ipynb</a><br>
+
+
+<a href="https://github.com/yingkaisha/keras-unet-collection/blob/main/keras_unet_collection/_model_swin_unet_2d.py">
+https://github.com/yingkaisha/keras-unet-collection: _model_swin_unet_2d.py </a><br>
+
+<a href="https://github.com/yingkaisha/keras-unet-collection/blob/main/keras_unet_collection/_model_transunet_2d.py">
+https://github.com/yingkaisha/keras-unet-collection: _model_transunet_2d.py</a><br>
+
+<a href="https://github.com/hamidriasat/UNet-3-Plus/blob/unet3p_lits/models/unet3plus_utils.py">
+https://github.com/hamidriasat/UNet-3-Plus: unet3plus_utils.py</a><br>
+
+<a href="https://github.com/yingkaisha/keras-unet-collection/blob/main/keras_unet_collection/_model_u2net_2d.py">
+https://github.com/yingkaisha/keras-unet-collection: _model_u2net_2d.py</a><br>
+<a href="https://github.com/ahmed-470/Segmentation_EfficientNetB7_Unet/blob/main/efficientnetb7_Unet.py">
+https://github.com/ahmed-470/Segmentation_EfficientNetB7_Unet: efficientnetb7_Unet.py</a>
+<br>
+<br>
+Please see also our repository <b><a href="https://github.com/sarah-antillia/Tensorflow-Image-Segmentation-API">
+Tensorflow-Image-Segmentation-API</a></b>.
+<br>
+<br>
+<h2>2. TensorFlowFlexUNet Image Segmentation for PanNuke </h2>
 This is the first experiment of Image Segmentation for PanNuke 
  based on 
 our <a href="./src/TensorFlowFlexUNet.py">TensorFlowFlexUNet</a>
@@ -18,8 +83,9 @@ On the dataset, please refer to our repository
 <a href="https://github.com/sarah-antillia/RGBMask-To-CategorizedMask-Conversion-Tool">
 RGBMask-To-CategorizedMask-Conversion-Tool.</a>
 <br>
-<br>
+
 <hr>
+<h3>Image Segmentation by TensorFlowFlexUNet</h3>
 <b>Actual Image Segmentation for 512x512 PanNuke Dataset</b><br>
 As shown below, the inferred masks look similar to the ground truth masks. <br>
 <table>
@@ -46,11 +112,10 @@ As shown below, the inferred masks look similar to the ground truth masks. <br>
 <td><img src="./projects/TensorFlowFlexUNet/PanNuke/mini_test_output/12036.png" width="320" height="auto"></td>
 </tr>
 </table>
-
 <hr>
+
 <br>
-<br>
-<b>1. Dataset Citation</b><br>
+<h3>3. Dataset Citation</h3><br>
 The dataset <a href="https://drive.google.com/file/d/1CxG_7CyIBiVqbf0kiNQJtMi3vvqJwTLi/view?usp=sharing">
 PanNuke-Mini-ImageMask-Dataset-With-Categorize-Masks.zip</a>. used here has been taken from.<br>
 https://www.kaggle.com/datasets/andrewmvd/cancer-inst-segmentation-and-classification<br>
@@ -101,11 +166,7 @@ Image by Otis Brawley released as public domain by National Cancer Institute, av
 <br>
 
 <br>
-<h3>
-<a id="2">
-2 PanNuke ImageMask Dataset
-</a>
-</h3>
+<h3>4. PanNuke ImageMask Dataset</h3>
  If you would like to train this PanNuke Segmentation model by yourself,
  please download the dataset from the google drive  
 <a href="https://drive.google.com/file/d/1CxG_7CyIBiVqbf0kiNQJtMi3vvqJwTLi/view?usp=sharing">
@@ -151,9 +212,7 @@ to use for a training set of our segmentation model.
 <img src="./projects/TensorFlowFlexUNet/PanNuke/asset/train_masks_sample.png" width="1024" height="auto">
 <br>
 
-<h3>
-3 Train TensorFlowFlexUNet Model
-</h3>
+<h3>5. Train TensorFlowFlexUNet Model</h3>
  We trained PanNuke TensorFlowFlexUNet Model by using the following
 <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config"> <b>train_eval_infer.config</b></a> file. <br>
 Please move to ./projects/TensorFlowFlexUNet/PanNuke and run the following bat file.<br>
@@ -264,9 +323,7 @@ In this experiment, the training process was stopped at epoch 47 by EarlyStoppin
 
 <br>
 
-<h3>
-4 Evaluation
-</h3>
+<h3>6. Evaluation</h3>
 Please move to <b>./projects/TensorFlowFlexUNet/PanNuke</b> folder,<br>
 and run the following bat file to evaluate TensorFlowUNet model for PanNuke.<br>
 <pre>
@@ -291,9 +348,7 @@ dice_coef_multiclass,0.9033
 </pre>
 <br>
 
-<h3>
-5 Inference
-</h3>
+<h3>7. Inference</h3>
 Please move to a <b>./projects/TensorFlowFlexUNet/PanNuke</b> folder<br>
 ,and run the following bat file to infer segmentation regions for images by the Trained-TensorFlowUNet model for PanNuke.<br>
 <pre>
