@@ -16,7 +16,7 @@ and so on. </li>
 </a>
 </h2>
 We implemented a set of various <b>TensorFlow Image Segmentation UNet Models for MultiClass</b>, which contains
- the following classes derived from <b><a href="./src/TensorFowFlexUNet.py">TensorFlowFlexUNet</a>.</b>
+ the following classes derived from <b><a href="./src/TensorFlowFlexUNet.py">TensorFlowFlexUNet</a>.</b>
 <br><br>
 <b> TensorFlow UNet Class Hierarchy </b><br>
 <pre>
