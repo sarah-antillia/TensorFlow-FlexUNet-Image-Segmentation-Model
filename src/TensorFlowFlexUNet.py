@@ -278,7 +278,7 @@ if __name__ == "__main__":
     
     # Create a UNetMolde and compile
     model    = TensorFlowFlexUNet(config_file)
-    
+  
   except:
     traceback.print_exc()
     

@@ -62,8 +62,6 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
     self.image_files += glob.glob(self.images_dir + "/*.jpg")
     self.image_files += glob.glob(self.images_dir + "/*.tif")
     self.image_files += glob.glob(self.images_dir + "/*.bmp")
-    # 2025/09/14
-    self.image_files = sorted(self.image_files)
     num_images = len(self.image_files)
     if self.num_infer_images > num_images:
         self.num_infer_images =  num_images
@@ -76,11 +74,13 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
       #print("--- on eoch_change end {}".format(image_file))
       predicted = self.flexmodel.predict(image_file)
       basename = os.path.basename(image_file)
-      #2025/09/14
+      
+      # 2025/06/09 Added the following 2 lines.
       if basename.endswith(".jpg"):
-        #The predicted is an image of the PIL P format, so we have to save is as a PNG fille. 
-        basename = basename.replace(".jpg", ".png")
+         basename = basename.replace(".jpg", ".png")
+      filename = basename
       filename = "Epoch_" +str(epoch+1) + "_" + basename
       output_filepath = os.path.join(self.output_dir, filename)
+  
       predicted.save(output_filepath)
       #print("Saved prediction {}".format(output_filepath))

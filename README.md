@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/07/10)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/09/19)</h2>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
 and retrained PanNuke segmetation model.</li> 
 <li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
@@ -8,7 +8,16 @@ and retrained PanNuke segmetation model.</li>
 <a href="./src/TensorFlowFlexAttentionUNet.py">TensorFlowFlexAttentionUNet</a>,
 <a href="./src/TensorFlowFlexSwinUNet.py">TensorFlowFlexSwinUNet</a>,
 and so on. </li>
-
+<li>2025/09/18: Fixed some bugs in <a href="./src/TensorFlowFlexModel.py">TensorFlowFlexModel.py</a>. </li>
+<li>2025/09/18: Modifed to resize mask to fit model image size in <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset.py</a>.
+ </li>
+<li>2025/09/18: Added <a href="./src/TensorFlowFlexUNetInspector.py">TensorFlowFlexUNetInspector.py</a> 
+to inspect TensorFlowFlexUNet model</a>, and 
+ <a href="./projects/TensorFlowFlexUNet/PanNuke/model_inspector.bat">model_inspector.bat</a> 
+  to generate <a href="./projects/TensorFlowFlexUNet/PanNuke/summary.txt">summary.txt</a> and 
+  <a href="./projects/TensorFlowFlexUNet/PanNuke/model.png">model.png</a>
+ </li>
+<li>2025/09/18: Modified to copy train_eval_infer.config to models dir.</li>
 <br>
 <h2>
 <a id="1">
@@ -115,7 +124,7 @@ As shown below, the inferred masks look similar to the ground truth masks. <br>
 <hr>
 
 <br>
-<h3>3. Dataset Citation</h3><br>
+<h3>3. Dataset Citation</h3>
 The dataset <a href="https://drive.google.com/file/d/1CxG_7CyIBiVqbf0kiNQJtMi3vvqJwTLi/view?usp=sharing">
 PanNuke-Mini-ImageMask-Dataset-With-Categorize-Masks.zip</a>. used here has been taken from.<br>
 https://www.kaggle.com/datasets/andrewmvd/cancer-inst-segmentation-and-classification<br>

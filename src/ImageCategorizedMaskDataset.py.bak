@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# ImageCategorizedMaskDataset.py
-#
 # 2025/06/03
 # 2025/06/07  Added an online rgb to categorized_mask function
 #   def rgb_to_categorized_mask(self, rgb_mask_file):
 #
-# 2025/09/08 Modified to resize the mask to a training size in create method.
+# ImageCategorizedMaskDataset.py
 
 import os
 import sys
@@ -103,9 +101,6 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
         mask = data['mask']
       elif mask_file.endswith(".png"):
         mask = self.rgb_to_categorized_mask(mask_file)
-        
-      #2025/09/08 Added the following line to resize the mask to training size.
-      mask = cv2.resize(mask, (self.image_width, self.image_height))
       Y[n] = mask
     return X, Y
     
