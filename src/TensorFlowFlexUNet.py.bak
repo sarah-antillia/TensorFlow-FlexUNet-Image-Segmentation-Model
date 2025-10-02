@@ -160,7 +160,7 @@ class TensorFlowFlexUNet(TensorFlowFlexModel):
     rkernel_sizes = rkernel_sizes[1:] 
     
     # kernel_sizes will become a list [(7,7),(5,5), (3,3),(3,3)...] if base_kernels were (7,7)
-    print("---Encoder kernel_size   {}".format(kernel_sizes))
+    print("--- kernel_size   {}".format(kernel_sizes))
     print("--- rkernel_size  {}".format(rkernel_sizes))
   
     dilation = None
@@ -190,11 +190,8 @@ class TensorFlowFlexUNet(TensorFlowFlexModel):
       dilation = dilations[i]
       #print("--- kernel_size {} dilation {}".format(kernel_size, dilation))
       #print("--- dilation {}".format(dilation))
-      if i <num_layers-1:
-        print("--- Encoder {} kernel_size {} dilation {}".format(i, kernel_size, dilation))
-      if i == num_layers:
-        print("    Bridge     kernel_size {} dilation {}".format(  kernel_size, dilation))
-
+      print("--- Encoder {} kernel_size {} dilation {}".format(i, kernel_size, dilation))
+      
       c = tf.keras.layers.Conv2D(filters, kernel_size, strides=strides, 
                  activation=self.activation, 
                  kernel_initializer='he_normal', dilation_rate=dilation, padding='same')(s)

@@ -37,6 +37,8 @@ from  tensorflow.keras.metrics import SparseCategoricalAccuracy
 
 from EpochChangeCallback import EpochChangeCallback
 from EpochChangeInferencer import EpochChangeInferencer
+from EpochChangeTiledInferencer import EpochChangeTiledInferencer
+
 from ImageCategorizedMaskDataset import ImageCategorizedMaskDataset
 from ImageCategorizedMaskDatasetGenerator import ImageCategorizedMaskDatasetGenerator
 
@@ -60,10 +62,12 @@ class TensorFlowFlexModel:
     self.config_file    = config_file
     self.config         = ConfigParser(config_file)
     self.seed           = self.SEED
-    self.verbose        = self.config.get(ConfigParser.DEBUG, "verbose")
+    self.verbose        = self.config.get(ConfigParser.DEBUG, "verbose", dvalue=False)
     self.image_height   = self.config.get(ConfigParser.MODEL, "image_height")
     self.image_width    = self.config.get(ConfigParser.MODEL, "image_width")
     self.image_channels = self.config.get(ConfigParser.MODEL, "image_channels")
+    self.split_size     = self.config.get(ConfigParser.TILEDINFER, "split_size", dvalue=512)
+    self.overlappging   = self.config.get(ConfigParser.TILEDINFER, "overlapping", dvalue=64)
 
     self.num_classes    = self.config.get(ConfigParser.MODEL, "num_classes")
     self.color_order    = self.config.get(ConfigParser.IMAGE,  "color_order", dvalue="RGB")
@@ -86,12 +90,13 @@ class TensorFlowFlexModel:
     self.dataset = Dataset(config_file, verbose=self.verbose)
     print("--- Dataset class {}".format(self.dataset))
 
+    """
     self.mini_test_dir    = self.config.get(ConfigParser.INFER, "images_dir")
-
-    self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir")
-     
-    if not os.path.exists(self.mini_test_output_dir):
-      os.makedirs(self.mini_test_output_dir)
+    self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir") 
+    if os.path.exists(self.mini_test_output_dir):
+      shutil.rmtree(self.mini_test_output_dir)
+    os.makedirs(self.mini_test_output_dir)
+    """
 
     # 205/06/07
     # Default mask_datatype = "categorized",   mask_file_format = ".npz"
@@ -192,8 +197,17 @@ class TensorFlowFlexModel:
   
     eval_dir = self.config.get(ConfigParser.EVAL, "eval_dir", dvalue="./eval")
 
-    epoch_change_inferencer   = EpochChangeInferencer(self, self.config_file)
-    callbacks.append(epoch_change_inferencer)
+    #2025/10/01 Modified
+    enabled_inferencer = self.config.get(ConfigParser.TRAIN, "epoch_change_infer", dvalue=True)
+    if enabled_inferencer: 
+      epoch_change_inferencer   = EpochChangeInferencer(self, self.config_file)
+      callbacks.append(epoch_change_inferencer)
+
+    #2025/10/01 Added
+    enabled_tiled_inferencer = self.config.get(ConfigParser.TRAIN, "epoch_change_tiled_infer", dvalue=False)
+    if enabled_tiled_inferencer:
+      epoch_change_tiled_inferencer   = EpochChangeTiledInferencer(self, self.config_file)  
+      callbacks.append(epoch_change_tiled_inferencer)
 
     epoch_change_callback   = EpochChangeCallback(eval_dir, self.train_metrics)
     callbacks.append(epoch_change_callback)
@@ -323,6 +337,14 @@ class TensorFlowFlexModel:
 
   def infer(self):
     self.load_model()
+    
+    # 2025/10/02 Moved here.
+    self.mini_test_dir        = self.config.get(ConfigParser.INFER, "images_dir")
+    self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir")
+     
+    if os.path.exists(self.mini_test_output_dir):
+      shutil.rmtree(self.mini_test_output_dir)
+    os.makedirs(self.mini_test_output_dir)
 
     image_files  = glob.glob(self.mini_test_dir + "/*.png")
     image_files += glob.glob(self.mini_test_dir + "/*.jpg")
@@ -384,7 +406,143 @@ class TensorFlowFlexModel:
       error = "Not found a weight_file " + self.weight_filepath
       raise Exception(error)
 
+  def tiled_infer(self):
+    self.load_model()
 
+    self.tiled_infer_images_dir = self.config.get(ConfigParser.TILEDINFER, "images_dir")
+    self.tiled_infer_output_dir = self.config.get(ConfigParser.TILEDINFER, "output_dir")
+     
+    if os.path.exists(self.tiled_infer_output_dir):
+      shutil.rmtree(self.tiled_infer_output_dir)
+    os.makedirs(self.tiled_infer_output_dir)
+
+    image_files  = glob.glob(self.tiled_infer_images_dir + "/*.png")
+    image_files += glob.glob(self.tiled_infer_images_dir + "/*.jpg")
+    image_files += glob.glob(self.tiled_infer_images_dir + "/*.tif")
+    image_files += glob.glob(self.tiled_infer_images_dir + "/*.bmp")
+
+    for image_file in image_files:
+      predicted_rgb_mask = self.tiled_infer_file(image_file)
+
+      basename = os.path.basename(image_file)
+    
+      if basename.endswith(".jpg"):
+        basename = basename.replace(".jpg", ".png")
+      output_filepath = os.path.join(self.tiled_infer_output_dir, basename)
+      basename = os.path.basename(image_file)
+    
+      predicted_rgb_mask.save(output_filepath)
+      print("=== Saved prediction {}".format(output_filepath))
+        
+
+  def xpredict(self, image):
+    ximg    = image.resize((self.image_width, self.image_height))
+      
+    #img = self.pil2cv(cropped)
+    img = self.pil2cv(ximg)
+
+    cw, ch  = ximg.size
+
+    img = np.expand_dims(img, axis=0)
+    predicted = self.model.predict(img)
+    predicted_argmax = np.argmax(predicted, axis=-1)[0] 
+ 
+    mask = self.convert_to_rgb(predicted_argmax)
+ 
+    # Resize the mask to the same size of the corresponding the cropped_size (cw, ch)
+    mask        = mask.resize((cw, ch))
+    return mask
+
+
+
+  def tiled_infer_file(self, image_file):
+      self.verbose = False
+
+      image   = Image.open(image_file)
+      image   = image.convert("RGB")
+  
+      #PIL image color_order = "rgb"
+      w, h    = image.size
+    
+      vert_split_num  = h // self.split_size
+      if h % self.split_size != 0:
+        vert_split_num += 1
+
+      horiz_split_num = w // self.split_size
+      if w % self.split_size != 0:
+        horiz_split_num += 1
+      self.bgcolor = (0, 0, 0)
+      background = Image.new("RGB", (w, h), self.bgcolor)
+
+      # Tiled image segmentation
+      for j in range(vert_split_num):
+        for i in range(horiz_split_num):
+          left  = self.split_size * i
+          upper = self.split_size * j
+          right = left  + self.split_size
+          lower = upper + self.split_size
+          
+          if left >=w or upper >=h:
+            continue 
+          
+          left_margin  = self.overlappging
+          upper_margin = self.overlappging
+          if left-self.overlappging <0:
+            left_margin = 0
+          if upper-self.overlappging <0:
+            upper_margin = 0
+
+          right_margin = self.overlappging
+          lower_margin = self.overlappging
+          if right + right_margin > w:
+            right_margin = 0
+          if lower + lower_margin > h:
+            lower_margin = 0
+
+          cropbox = (left  - left_margin,  upper - upper_margin, 
+                     right + right_margin, lower + lower_margin )
+
+          if self.verbose:
+            print("tiled_infer_file:: cropbox {}".format(cropbox))
+
+          # Crop a region specified by the cropbox from the whole image to create a tiled image segmentation.      
+          cropped = image.crop(cropbox)
+
+          # Get the size of the cropped image.
+          cw, ch  = cropped.size
+
+          # Resize the cropped image to the model image size (width, height) for a prediction.
+          cropped = cropped.resize((self.image_width, self.image_height))
+  
+          img = np.array(cropped, dtype=np.uint8)
+
+          img = np.expand_dims(img, axis=0)
+          predicted = self.model.predict(img)
+          predicted_argmax = np.argmax(predicted, axis=-1)[0] 
+ 
+          mask = self.convert_to_rgb(predicted_argmax)
+ 
+          # Resize the mask to the same size of the corresponding the cropped_size (cw, ch)
+          mask = mask.resize((cw, ch))
+        
+          right_position = left_margin + self.image_width
+          if right_position > cw:
+             right_position = cw
+
+          bottom_position = upper_margin + self.image_height
+          if bottom_position > ch:
+             bottom_position = ch
+
+          # Excluding margins of left, upper, right and bottom from the mask.           
+          mask         = mask.crop((left_margin, upper_margin, 
+                                  right_position, bottom_position)) 
+          
+          #iw, ih = mask.size
+          background.paste(mask, (left, upper))
+        
+      return background
+
+  
   #2025/09/15 Corrected an indent of this function to be a method of this class.
   def inspect(self, image_file='./model.png', summary_file="./summary.txt"):
     # Please download and install graphviz for your OS

@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/09/19)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/10/02)</h2>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
 and retrained PanNuke segmetation model.</li> 
 <li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
@@ -18,6 +18,9 @@ to inspect TensorFlowFlexUNet model</a>, and
   <a href="./projects/TensorFlowFlexUNet/PanNuke/model.png">model.png</a>
  </li>
 <li>2025/09/18: Modified to copy train_eval_infer.config to models dir.</li>
+<li>2025/10/02: Added <a href="./src/TensorFlowFlexUNetTiledInferencer.py">TensorFlowFlexUNetTiledInferencer.py</a> and 
+<a href="./src/EpochChangeTiledInferencer.py">EpochChangeTiledInferencer.py</a>.
+</li>
 <br>
 <h2>
 <a id="1">
