@@ -20,6 +20,7 @@
 # 2025/09/15 Modified to remove mini_test_output_dir if it exists, and to recreate the directory.
 
 # 2026/04/16 Addded self.infer3d method to support 3d volume inference.
+# 2026/04/18 Updated infer3d method to generate better mask overlay images.
 
 
 import os
@@ -466,22 +467,25 @@ class TensorFlowFlexModel:
           
           mask_filepath = os.path.join(output_masks_dir, slice_filename)
           predicted_rgb_mask =self.predict(slice)
-        
+          
           predicted_rgb_mask.save(mask_filepath)
           print("=== Saved prediction {}".format(mask_filepath))
+          cv_mask   = cv2.imread(mask_filepath)
 
+          gray_mask = cv2.cvtColor(cv_mask, cv2.COLOR_BGR2GRAY)
+          _, bin_mask = cv2.threshold(gray_mask, 0, 255, cv2.THRESH_BINARY)
+         
           slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
-
-          mask = cv2.imread(mask_filepath)
-
+          slice[bin_mask==255] = (0,0,0)
+     
           # Create a mask-overlay image from the slice and mask
           # dst = img * alpha + mask * beta + gamma
-          mask_overlay = cv2.addWeighted(slice, self.overlay_alpha, mask, self.overlay_beta, self.overlay_gamma)
-
+          #mask_overlay = cv2.addWeighted(slice, self.overlay_alpha, mask, self.overlay_beta, self.overlay_gamma)
+          mask_overlay = slice + cv_mask
           overlay_filepath = os.path.join(output_overlays_dir, slice_filename)
           cv2.imwrite(overlay_filepath, mask_overlay)
           print("=== Saved overlay {}".format(mask_filepath))
-
+  
   def pil2cv(self, image):
     new_image = np.array(image, dtype=np.uint8)
     if new_image.ndim == 2: 
