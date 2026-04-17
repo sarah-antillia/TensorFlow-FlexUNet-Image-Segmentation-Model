@@ -1,5 +1,5 @@
 <h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/04/17)</h2>
-
+<b>Toshiyuki Arai</b><br>
 <b>Software Laboratory antillia.com</b><br>
 <ul>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
