@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/04/17)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/04/18)</h2>
 <b>Toshiyuki Arai</b><br>
 <b>Software Laboratory antillia.com</b><br>
 <ul>
@@ -33,7 +33,6 @@ to run TensorFlowFlexUNet3DInferencer.py.
 <br>Please see our GitHub repository <a href="https://github.com/sarah-antillia/TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset">
  TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset</a> for 2D Slice Segmentation of 3D Volume NIfTI files.
 </li>
-<li>
 <li>2026/04/18: Updated an infer3d method of <a href="./src/TensorFlowFlexModel.py">TensorFlowFlexModel</a> class.
 </li>
 </ul>
