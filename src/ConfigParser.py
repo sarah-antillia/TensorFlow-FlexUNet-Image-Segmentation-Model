@@ -58,6 +58,10 @@ class ConfigParser:
   PINCDISTORTION = "pincdistortion"
 
   PREPROCESSOR = "preprocessor"
+  
+  #2026/06/16
+  # Segmentation for 3DVolume of NIfTI files. 
+  INFER3D      = "infer3d"
 
   # Constructor
   # 

@@ -53,7 +53,7 @@ if __name__ == "__main__":
     print("---MODEL_CLASS {}".format(MODEL_CLASS))
     model = MODEL_CLASS(config_file)
     
-    model.load_model()
+    #model.load_model()
     model.evaluate()
 
   except:

@@ -13,8 +13,8 @@
 # limitations under the License.
 #
 
-# 2025/06/05
-# TensorFlowFlexUNetInferencer.py
+# 2026/04/16
+# TensorFlowFlexUNet3DInferencer.py
 
 import os
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
@@ -51,8 +51,8 @@ if __name__ == "__main__":
     MODEL_CLASS = eval(config.get(ConfigParser.MODEL, "model"))
     model = MODEL_CLASS(config_file)
 
-    #model.load_model()
-    model.infer()
+    #2026/04/16 
+    model.infer3d()
 
   except:
     traceback.print_exc()

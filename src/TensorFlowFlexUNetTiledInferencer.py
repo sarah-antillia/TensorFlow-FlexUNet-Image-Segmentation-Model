@@ -51,7 +51,7 @@ if __name__ == "__main__":
     MODEL_CLASS = eval(config.get(ConfigParser.MODEL, "model"))
     model = MODEL_CLASS(config_file)
 
-    model.load_model()
+    #model.load_model()
     model.tiled_infer()
 
   except:

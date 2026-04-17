@@ -74,7 +74,11 @@ class EpochChangeInferencer(tf.keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs):
     for image_file in self.image_files:
       #print("--- on eoch_change end {}".format(image_file))
-      predicted = self.flexmodel.predict(image_file)
+      #2026/0/04/16
+      img = cv2.imread(image_file)
+      predicted = self.flexmodel.predict(img)
+      #predicted = self.flexmodel.predict(image_file)
+
       basename = os.path.basename(image_file)
       #2025/09/14
       if basename.endswith(".jpg"):

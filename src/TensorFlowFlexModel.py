@@ -19,6 +19,9 @@
 # 2025/09/08 Modified to resize the PIL predicted_rgb_mask to the original image size in predict method.
 # 2025/09/15 Modified to remove mini_test_output_dir if it exists, and to recreate the directory.
 
+# 2026/04/16 Addded self.infer3d method to support 3d volume inference.
+
+
 import os
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 os.environ["TF_ENABLE_GPU_GARBAGE_COLLECTION"]="true"
@@ -46,6 +49,8 @@ from dice_coef_multiclass import dice_coef_multiclass, dice_loss_multiclass
 import json
 import traceback
 from PIL import Image
+
+import nibabel as  nib
 
 from ConfigParser import ConfigParser
 
@@ -350,9 +355,12 @@ class TensorFlowFlexModel:
     image_files += glob.glob(self.mini_test_dir + "/*.jpg")
     image_files += glob.glob(self.mini_test_dir + "/*.tif")
     image_files += glob.glob(self.mini_test_dir + "/*.bmp")
+ 
+    for image_file in image_files:      
+      img = cv2.imread(image_file)
+      predicted_rgb_mask = self.predict(img)
 
-    for image_file in image_files:
-      predicted_rgb_mask = self.predict(image_file)
+      #predicted_rgb_mask = self.predict(image_file)
       basename = os.path.basename(image_file)
       #2025/06/10
       if basename.endswith(".jpg"):
@@ -363,9 +371,131 @@ class TensorFlowFlexModel:
       predicted_rgb_mask.save(output_filepath)
       print("=== Saved prediction {}".format(output_filepath))
 
+  # 2026/04/16
+  def normalize(self, image):
+    min = np.min(image)/255.0
+    max = np.max(image)/255.0
+    scale = (max - min)
+    if scale == 0:
+      scale +=  1
+    image = (image -min) / scale
+    image = image.astype('uint8') 
+    return image
+  
+  def get_num_slices(self, shape):
+    num = 0
+    if self.slice_shape_order =="hwd":
+      h, w, num = shape
+    elif self.slice_shape_order =="dhw":
+      num, h, w, = shape
+    return num
 
-  def predict(self, image_file):
-      img = cv2.imread(image_file)
+  def get_slice(self, fdata, i):
+    slice = None
+    if self.slice_shape_order == "hwd":
+      slice = fdata[:,:,i]
+    elif self.slice_shape_order == "dhw":
+      slice = fdata[i,:,:]
+    return slice
+  
+  def infer3d(self):
+    self.load_model()
+    
+    self.mini_test_3d_dir        = self.config.get(ConfigParser.INFER3D, "images_dir")
+    self.mini_test_3d_output_dir = self.config.get(ConfigParser.INFER3D, "output_dir")
+     
+    if os.path.exists(self.mini_test_3d_output_dir):
+      shutil.rmtree(self.mini_test_3d_output_dir)
+    os.makedirs(self.mini_test_3d_output_dir)
+
+    self.slice_resize   = self.config.get(ConfigParser.INFER3D, "slice_resize", dvalue=(512,512)) 
+    self.slice_rotation = self.config.get(ConfigParser.INFER3D, "slice_rotation", dvalue=cv2.ROTATE_90_CLOCKWISE) 
+    self.slice_shape_order = self.config.get(ConfigParser.INFER3D, "slice_shape_order", dvalue="hwd")
+    
+    self.mask_overly   = self.config.get(ConfigParser.INFER3D, "mask_overlay", dvalue=True)
+    self.overlay_alpha = self.config.get(ConfigParser.INFER3D, "overlay_alpha", dvalue=0.5)
+    self.overlay_beta  = self.config.get(ConfigParser.INFER3D, "overlay_beta", dvalue=0.5)
+    self.overlay_gamma = self.config.get(ConfigParser.INFER3D, "overlay_gamma", dvalue=0)
+
+    if os.path.exists(self.mini_test_3d_output_dir):
+      shutil.rmtree(self.mini_test_3d_output_dir)
+
+    nii_files    = glob.glob(self.mini_test_3d_dir + "/*.nii")
+    nii_files  +=  glob.glob(self.mini_test_3d_dir + "/*.nii.gz")
+
+    for nii_file in nii_files:
+      data   = nib.load(nii_file)
+      fdata  = data.get_fdata()
+      self.slice_rotation =  cv2.ROTATE_90_CLOCKWISE
+      shape = fdata.shape
+      if len(shape) == 4:
+         raise Exception("Unsupported a nii image shape {}".format(shape))
+      
+      basename = os.path.basename(nii_file)
+
+      output_3d_base_dir = os.path.join(self.mini_test_3d_output_dir, basename)
+      os.makedirs(output_3d_base_dir)
+
+      output_slices_dir   = os.path.join(output_3d_base_dir, "slices")    # image
+      output_masks_dir    = os.path.join(output_3d_base_dir, "masks")     # prediction
+      output_overlays_dir = os.path.join(output_3d_base_dir, "overlays")  # overlay
+
+      os.makedirs(output_slices_dir)
+      os.makedirs(output_masks_dir)
+      os.makedirs(output_overlays_dir)
+
+      if len(shape) == 3:
+        num = self.get_num_slices(shape)
+        
+        for i in range(num):
+          #Get slice from fdata
+          slice = self.get_slice(fdata, i)
+          slice = self.normalize(slice)
+   
+          if self.slice_rotation !=None:
+            slice = cv2.rotate(slice, self.slice_rotation)
+
+          if self.slice_resize != None:
+            slice = cv2.resize(slice, self.slice_resize)
+
+          slice_filename = str(i+1) + ".png"
+          slice_filepath = os.path.join(output_slices_dir, slice_filename)
+          
+          cv2.imwrite(slice_filepath, slice)
+          print("Saved slice {}".format(slice_filepath))
+          
+          mask_filepath = os.path.join(output_masks_dir, slice_filename)
+          predicted_rgb_mask =self.predict(slice)
+        
+          predicted_rgb_mask.save(mask_filepath)
+          print("=== Saved prediction {}".format(mask_filepath))
+
+          slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
+
+          mask = cv2.imread(mask_filepath)
+
+          # Create a mask-overlay image from the slice and mask
+          # dst = img * alpha + mask * beta + gamma
+          mask_overlay = cv2.addWeighted(slice, self.overlay_alpha, mask, self.overlay_beta, self.overlay_gamma)
+
+          overlay_filepath = os.path.join(output_overlays_dir, slice_filename)
+          cv2.imwrite(overlay_filepath, mask_overlay)
+          print("=== Saved overlay {}".format(mask_filepath))
+
+  def pil2cv(self, image):
+    new_image = np.array(image, dtype=np.uint8)
+    if new_image.ndim == 2: 
+        pass
+    elif new_image.shape[2] == 3: 
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+    elif new_image.shape[2] == 4: 
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
+    return new_image
+  
+  #2026/04/16
+  #def predict(self, image_file):
+  def predict(self, img):
+      #img = cv2.imread(image_file)
       # 2025/09/08 Get a size of the image_file
       shape = img.shape
       h     = shape[0]
@@ -434,26 +564,6 @@ class TensorFlowFlexModel:
       predicted_rgb_mask.save(output_filepath)
       print("=== Saved prediction {}".format(output_filepath))
         
-
-  def xpredict(self, image):
-    ximg    = image.resize((self.image_width, self.image_height))
-      
-    #img = self.pil2cv(cropped)
-    img = self.pil2cv(ximg)
-
-    cw, ch  = ximg.size
-
-    img = np.expand_dims(img, axis=0)
-    predicted = self.model.predict(img)
-    predicted_argmax = np.argmax(predicted, axis=-1)[0] 
- 
-    mask = self.convert_to_rgb(predicted_argmax)
- 
-    # Resize the mask to the same size of the corresponding the cropped_size (cw, ch)
-    mask        = mask.resize((cw, ch))
-    return mask
-
-
 
   def tiled_infer_file(self, image_file):
       self.verbose = False

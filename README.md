@@ -1,4 +1,7 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2025/10/02)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/04/17)</h2>
+
+<b>Software Laboratory antillia.com</b><br>
+<ul>
 <li>2025/06/07: Updated <a href="./projects/TensorFlowFlexUNet/PanNuke/train_eval_infer.config">train_eval_infer.config</a> 
 and retrained PanNuke segmetation model.</li> 
 <li>2025/06/08: Added <b>rgb_to_categorized_mask</b> converter to <a href="./src/ImageCategorizedMaskDataset.py">ImageCategorizedMaskDataset</a> class</li>
@@ -21,11 +24,18 @@ to inspect TensorFlowFlexUNet model</a>, and
 <li>2025/10/02: Added <a href="./src/TensorFlowFlexUNetTiledInferencer.py">TensorFlowFlexUNetTiledInferencer.py</a> and 
 <a href="./src/EpochChangeTiledInferencer.py">EpochChangeTiledInferencer.py</a>.
 </li>
-<br>
+<li>2026/04/17: Added a Python script <a href="./src/TensorFlowFlexUNet3DInferencer.py">TensorFlowFlexUNet3DInferencer.py</a>
+for 2D slices of 3D Volume NIfTI files.
+</li>
+<li>2026/04/17: Added an infer3d method to <a href="./src/TensorFlowFlexModel.py">TensorFlowFlexModel</a> class, and 
+a bat file <a href="./../../5.infer3d.bat">5.infer3d.bat</a>
+to run TensorFlowFlexUNet3DInferencer.py.
+<br>Please see our GitHub repository <a href="https://github.com/sarah-antillia/TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset">
+ TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset</a> for 2D Slice Segmentation of 3D Volume NIfTI files.
+</li>
+</ul>
 <h2>
-<a id="1">
 1 TensorFlowFlexUNet Image Segmentation Model
-</a>
 </h2>
 We implemented a set of various <b>TensorFlow Image Segmentation UNet Models for MultiClass</b>, which contains
  the following classes derived from <b><a href="./src/TensorFlowFlexUNet.py">TensorFlowFlexUNet</a>.</b>
@@ -453,6 +463,11 @@ Toshiyuki Arai @antillia.com<br>
 https://github.com/sarah-antillia/RGBMask-To-CategorizedMask-Conversion-Tool</a>
 <br>
 <br>
+<b>4. TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset</b><br>
+Toshiyuki Arai @antillia.com<br>
+<a href="https://github.com/sarah-antillia/TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset">
+https://github.com/sarah-antillia/TensorFlow-FlexUNet-Image-Segmentation-MICCAI-FeTS2021-T2W-Subset</a>. 
+<br><br> 
 <b>5. Tensorflow-Image-Segmentation-API</b><br>
 Toshiyuki Arai @antillia.com<br>
 <a href="https://github.com/sarah-antillia/Tensorflow-Image-Segmentation-API">
