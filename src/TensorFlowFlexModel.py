@@ -19,8 +19,8 @@
 # 2025/09/08 Modified to resize the PIL predicted_rgb_mask to the original image size in predict method.
 # 2025/09/15 Modified to remove mini_test_output_dir if it exists, and to recreate the directory.
 
-# 2026/04/16 Addded self.infer3d method to support 3d volume inference.
-# 2026/04/18 Updated infer3d method to generate better mask overlay images.
+# 2026/04/16 Addded infer3d method to support 3d volume inference.
+# 2026/04/27 Updated the infer3d method to index output filenames starting from 10001.
 
 
 import os
@@ -444,7 +444,8 @@ class TensorFlowFlexModel:
       os.makedirs(output_slices_dir)
       os.makedirs(output_masks_dir)
       os.makedirs(output_overlays_dir)
-
+      #2026/04/27
+      index = 10001
       if len(shape) == 3:
         num = self.get_num_slices(shape)
         
@@ -458,8 +459,10 @@ class TensorFlowFlexModel:
 
           if self.slice_resize != None:
             slice = cv2.resize(slice, self.slice_resize)
+          #2026/04/27
+          #slice_filename = str(i+1) + ".png"
+          slice_filename = str(index+i) + ".png"
 
-          slice_filename = str(i+1) + ".png"
           slice_filepath = os.path.join(output_slices_dir, slice_filename)
           
           cv2.imwrite(slice_filepath, slice)
