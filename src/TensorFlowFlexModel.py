@@ -22,6 +22,8 @@
 # 2026/04/16 Addded infer3d method to support 3d volume inference.
 # 2026/04/27 Updated the infer3d method to index output filenames starting from 10001.
 
+# 2026/05/14 Updated the infer3d method TensorFlowFlexModel class to support an MHA volume file.
+# 2026/05/14 Added generate_maskoverkay method to TensorFlowFlexModel class.
 
 import os
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
@@ -52,6 +54,10 @@ import traceback
 from PIL import Image
 
 import nibabel as  nib
+
+# 2026/05/14
+# pip install SimpleITK
+import SimpleITK as sitk
 
 from ConfigParser import ConfigParser
 
@@ -383,6 +389,37 @@ class TensorFlowFlexModel:
     image = image.astype('uint8') 
     return image
   
+
+  def get_volume(self, volume_file):
+    volume   = None
+    basename = os.path.basename(volume_file)
+    if basename.endswith(".nii") or basename.endswith(".nii.gz"):
+      data   = nib.load(volume_file)
+      volume = data.get_fdata()
+    elif basename.endswith(".mha"):
+      data   = sitk.ReadImage(volume_file)
+      volume = sitk.GetArrayFromImage(data)
+    else:
+      print("Unsupported volume file")
+    return volume
+
+  # 2026/05/14 Generate a maskoverly from an image_file and the corresponding mask file.
+  def generate_maskoverkay(self, image_filepath, mask_filepath):
+    if os.path.exists(image_filepath) and os.path.exists(mask_filepath):
+      image = cv2.imread(image_filepath)
+
+      mask  = cv2.imread(mask_filepath)
+      gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+      _, bin_mask = cv2.threshold(gray_mask, 0, 255, cv2.THRESH_BINARY)
+         
+      image[bin_mask==255] = (0,0,0)
+      mask_overlay = image + mask
+
+      return mask_overlay
+    else:
+      raise Exception("Not found an image or mask file")
+      
+
   def get_num_slices(self, shape):
     num = 0
     if self.slice_shape_order =="hwd":
@@ -397,6 +434,8 @@ class TensorFlowFlexModel:
       slice = fdata[:,:,i]
     elif self.slice_shape_order == "dhw":
       slice = fdata[i,:,:]
+    #2026/05/07
+    #slice = slice.astype('uint8') 
     return slice
   
   def infer3d(self):
@@ -408,9 +447,11 @@ class TensorFlowFlexModel:
     if os.path.exists(self.mini_test_3d_output_dir):
       shutil.rmtree(self.mini_test_3d_output_dir)
     os.makedirs(self.mini_test_3d_output_dir)
+    #2026/05/07 Added the following line.
+    self.slice_normalize = self.config.get(ConfigParser.INFER3D, "slice_normalize", dvalue=True)
 
-    self.slice_resize   = self.config.get(ConfigParser.INFER3D, "slice_resize", dvalue=(512,512)) 
-    self.slice_rotation = self.config.get(ConfigParser.INFER3D, "slice_rotation", dvalue=cv2.ROTATE_90_CLOCKWISE) 
+    self.slice_resize    = self.config.get(ConfigParser.INFER3D, "slice_resize", dvalue=(512,512)) 
+    self.slice_rotation  = self.config.get(ConfigParser.INFER3D, "slice_rotation", dvalue=cv2.ROTATE_90_CLOCKWISE) 
     self.slice_shape_order = self.config.get(ConfigParser.INFER3D, "slice_shape_order", dvalue="hwd")
     
     self.mask_overly   = self.config.get(ConfigParser.INFER3D, "mask_overlay", dvalue=True)
@@ -421,18 +462,20 @@ class TensorFlowFlexModel:
     if os.path.exists(self.mini_test_3d_output_dir):
       shutil.rmtree(self.mini_test_3d_output_dir)
 
-    nii_files    = glob.glob(self.mini_test_3d_dir + "/*.nii")
-    nii_files  +=  glob.glob(self.mini_test_3d_dir + "/*.nii.gz")
+    volume_files    = glob.glob(self.mini_test_3d_dir + "/*.nii")
+    volume_files  +=  glob.glob(self.mini_test_3d_dir + "/*.nii.gz")
+    volume_files  +=  glob.glob(self.mini_test_3d_dir + "/*.mha")
 
-    for nii_file in nii_files:
-      data   = nib.load(nii_file)
-      fdata  = data.get_fdata()
-      self.slice_rotation =  cv2.ROTATE_90_CLOCKWISE
-      shape = fdata.shape
+    for volume_file in volume_files:
+      volume = self.get_volume(volume_file)
+
+      #2026/05/07
+      #self.slice_rotation =  cv2.ROTATE_90_CLOCKWISE
+      shape = volume.shape
       if len(shape) == 4:
          raise Exception("Unsupported a nii image shape {}".format(shape))
       
-      basename = os.path.basename(nii_file)
+      basename = os.path.basename(volume_file)
 
       output_3d_base_dir = os.path.join(self.mini_test_3d_output_dir, basename)
       os.makedirs(output_3d_base_dir)
@@ -450,11 +493,13 @@ class TensorFlowFlexModel:
         num = self.get_num_slices(shape)
         
         for i in range(num):
-          #Get slice from fdata
-          slice = self.get_slice(fdata, i)
-          slice = self.normalize(slice)
+          #Get slice from 3d volume
+          slice = self.get_slice(volume, i)
+          # 2026/05/07 
+          if self.slice_normalize:
+            slice = self.normalize(slice)
    
-          if self.slice_rotation !=None:
+          if self.slice_rotation != None: #in [cv2.ROTATE_180, cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
             slice = cv2.rotate(slice, self.slice_rotation)
 
           if self.slice_resize != None:
@@ -467,7 +512,8 @@ class TensorFlowFlexModel:
           
           cv2.imwrite(slice_filepath, slice)
           print("Saved slice {}".format(slice_filepath))
-          
+          slice = cv2.imread(slice_filepath)
+
           mask_filepath = os.path.join(output_masks_dir, slice_filename)
           predicted_rgb_mask =self.predict(slice)
           
@@ -478,13 +524,14 @@ class TensorFlowFlexModel:
           gray_mask = cv2.cvtColor(cv_mask, cv2.COLOR_BGR2GRAY)
           _, bin_mask = cv2.threshold(gray_mask, 0, 255, cv2.THRESH_BINARY)
          
-          slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
+          #slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
           slice[bin_mask==255] = (0,0,0)
      
           # Create a mask-overlay image from the slice and mask
           # dst = img * alpha + mask * beta + gamma
           #mask_overlay = cv2.addWeighted(slice, self.overlay_alpha, mask, self.overlay_beta, self.overlay_gamma)
           mask_overlay = slice + cv_mask
+    
           overlay_filepath = os.path.join(output_overlays_dir, slice_filename)
           cv2.imwrite(overlay_filepath, mask_overlay)
           print("=== Saved overlay {}".format(mask_filepath))

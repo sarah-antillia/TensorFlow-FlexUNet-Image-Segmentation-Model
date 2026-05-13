@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/04/27)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/05/14)</h2>
 <b>Toshiyuki Arai</b><br>
 <b>Software Laboratory antillia.com</b><br>
 <ul>
@@ -44,6 +44,12 @@ to run TensorFlowFlexUNet3DInferencer.py.
  <a href="https://github.com/sarah-antillia/TensorFlow-FlexUNet-Image-Segmentation-MU-Glioma-Post-T1N-Subset">
  TensorFlow-FlexUNet-Image-Segmentation-MU-Glioma-Post-T1N-Subset
  </a>.
+</li>
+<li>
+2026/05/14: Updated the infer3d method of TensorFlowFlexModel class to support an MHA volume file.
+</li>
+<li>
+2026/05/14: Added a generate_maskoverkay method to TensorFlowFlexModel class.
 </li>
 </ul>
 <h2>
