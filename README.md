@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/05/14)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/06/13)</h2>
 <b>Toshiyuki Arai</b><br>
 <b>Software Laboratory antillia.com</b><br>
 <ul>
@@ -50,6 +50,18 @@ to run TensorFlowFlexUNet3DInferencer.py.
 </li>
 <li>
 2026/05/14: Added a generate_maskoverkay method to TensorFlowFlexModel class.
+</li>
+<li>
+2026/06/03:Updated infer3d method to support NPY 3D volume inference.
+</li>
+<li>
+2026/06/05:Updated normalized method.
+</li>
+<li>
+2026/06/05:Updated infer3d method to eval slice_rotation.
+</li>
+<li>
+2026/06/10:Updated infer3d method to support H5 3D volume inference.
 </li>
 </ul>
 <h2>
