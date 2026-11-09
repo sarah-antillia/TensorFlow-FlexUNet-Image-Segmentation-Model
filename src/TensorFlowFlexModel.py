@@ -14,25 +14,15 @@
 #
 # TensorFlowFlexModel.py
 
-# 2025/06/05 T.Arai
+# 2025/06/05 Initial version.
 # 2025/06/15 Modified to support an online augmentation.
 # 2025/09/08 Modified to resize the PIL predicted_rgb_mask to the original image size in predict method.
 # 2025/09/15 Modified to remove mini_test_output_dir if it exists, and to recreate the directory.
 
 # 2026/04/16 Addded infer3d method to support 3d volume inference.
 # 2026/04/27 Updated the infer3d method to index output filenames starting from 10001.
-
-# 2026/05/14 Updated the infer3d method TensorFlowFlexModel class to support an MHA volume file.
-# 2026/05/14 Added generate_maskoverkay method to TensorFlowFlexModel class.
-
-# 2026/06/03 Updated infer3d method to support NPY 3d volume inference.
-
-# 2026/06/05 Updated normalized method.
-
-# 2026/06/05 Updated infer3d method to eval slice_rotation.
-#   You may specify a string like "cv2.RORATE_90CLOCKWISE" in slice_rotation in [infer3d] section
-
-# 2026/06/10 Updated infer3d method to support H5 3d volume inference.
+# 2026/09/23 Modified dice_loss_multiclass to import dice_coef_foreground, dice_loss_foreground
+# 2026/09/23 Modified to import a custom loss function CategoricalFocalDiceLoss.
 
 import os
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
@@ -44,10 +34,12 @@ import shutil
 import cv2
 import tensorflow
 import tensorflow as tf
+
 from tensorflow.keras import layers
 import numpy as np
 import matplotlib.pyplot as plt
 from  tensorflow.keras.losses import SparseCategoricalCrossentropy
+
 from  tensorflow.keras.metrics import SparseCategoricalAccuracy 
 
 from EpochChangeCallback import EpochChangeCallback
@@ -58,17 +50,21 @@ from ImageCategorizedMaskDataset import ImageCategorizedMaskDataset
 from ImageCategorizedMaskDatasetGenerator import ImageCategorizedMaskDatasetGenerator
 
 from dice_coef_multiclass import dice_coef_multiclass, dice_loss_multiclass
+
+# 2026/09/25
+# 2026/09/23 Added the following line.
+from dice_coef_multiclass import dice_coef_foreground, dice_loss_foreground
+from dice_coef_multiclass import dice_coef_hybrid
+from dice_coef_multiclass import DiceCoefHybrid
+
+# 2026/09/23 Added the following line to support a custom loss function deriveed from tf.keras.losses.Loss
+from focal_dice_loss import CategoricalFocalDiceLoss
+
 import json
 import traceback
 from PIL import Image
 
 import nibabel as  nib
-
-# 2026/05/14
-# pip install SimpleITK
-import SimpleITK as sitk
-# 2026/0610
-import h5py
 
 from ConfigParser import ConfigParser
 
@@ -94,6 +90,8 @@ class TensorFlowFlexModel:
 
     self.num_classes    = self.config.get(ConfigParser.MODEL, "num_classes")
     self.color_order    = self.config.get(ConfigParser.IMAGE,  "color_order", dvalue="RGB")
+    # 2026/09/05 Added the following line. Default = "PNG", but you may specify file_format = "NPY" for .npy images. 
+    self.file_format    = self.config.get(ConfigParser.IMAGE,  "file_format", dvalue="PNG")
     
     #Multi-class NumPy NPZ (multi-class categorized mask file format) 
     numpy_npz = ".npz"
@@ -108,7 +106,9 @@ class TensorFlowFlexModel:
     self.valid_images_dir = self.config.get(ConfigParser.VALID, "images_dir")
     self.valid_masks_dir  = self.config.get(ConfigParser.VALID, "masks_dir" ) 
                                             
-      
+    # 2026/09/25 
+    DiceCoefHybrid.set_weight_parameters(config_file)
+  
     Dataset     = eval(self.config.get(ConfigParser.DATASET, "class_name", dvalue="ImageCategorizedMaskDataset"))
     self.dataset = Dataset(config_file, verbose=self.verbose)
     print("--- Dataset class {}".format(self.dataset))
@@ -121,7 +121,7 @@ class TensorFlowFlexModel:
     os.makedirs(self.mini_test_output_dir)
     """
 
-    # 205/06/07
+    # 2025/06/07
     # Default mask_datatype = "categorized",   mask_file_format = ".npz"
     # You may specify mask_datatype="indexed", mask_file_format = ".png"
     self.mask_datatype = self.config.get(ConfigParser.MASK, "mask_datatype", dvalue = "categorized")
@@ -156,7 +156,7 @@ class TensorFlowFlexModel:
 
     self.model.loaded = False
 
-
+    
   # Please define your own create_model method in a subclass
   def create_model(self):
     #raise Exception("Error: Not implemented yet")
@@ -186,14 +186,18 @@ class TensorFlowFlexModel:
 
     # Specify a list of metrics name, which can be used to compile a UNet model. 
     metrics  = self.config.get(ConfigParser.MODEL, "metrics", dvalue=["dice_coef_multiclass"])
-   
+ 
+    print("Metrics ", metrics)
     self.metrics = []
     for metric in metrics:
       m = eval(metric)
       self.metrics.append(m)
 
     self.loss = self.config.get(ConfigParser.MODEL, "loss", dvalue="categorical_crossentropy") 
-
+    # 2026/09/23 To enable the CategoricalFocalDiceLoss 
+    if self.loss == "categorical_focal_dice_loss":
+      self.loss = CategoricalFocalDiceLoss()
+    print("Loss function ", self.loss)
     self.model.compile(optimizer = self.optimizer,
               loss    = self.loss,
               metrics = self.metrics)
@@ -365,78 +369,75 @@ class TensorFlowFlexModel:
     self.mini_test_dir        = self.config.get(ConfigParser.INFER, "images_dir")
     self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir")
      
+    self.mini_test_npy_slice_index = self.config.get(ConfigParser.INFER, "npy_slice_index", dvalue=1)
+    self.mini_test_npy_slices_dir  = self.config.get(ConfigParser.INFER, "npy_slices_dir", dvalue=None)
+    #./mini_test_slices")
+    
     if os.path.exists(self.mini_test_output_dir):
       shutil.rmtree(self.mini_test_output_dir)
     os.makedirs(self.mini_test_output_dir)
+
+    #2026/09/05 Added the following lines.
+    #2026/09/23 Modified the following line to use and not or.
+    if self.mini_test_npy_slices_dir != None and len(self.mini_test_npy_slices_dir)>0:
+      if os.path.exists(self.mini_test_npy_slices_dir):
+        shutil.rmtree(self.mini_test_npy_slices_dir)
+      os.makedirs(self.mini_test_npy_slices_dir)
 
     image_files  = glob.glob(self.mini_test_dir + "/*.png")
     image_files += glob.glob(self.mini_test_dir + "/*.jpg")
     image_files += glob.glob(self.mini_test_dir + "/*.tif")
     image_files += glob.glob(self.mini_test_dir + "/*.bmp")
- 
+
+    #2026/09/05 Adde the following to suport multimodal images
+    image_files += glob.glob(self.mini_test_dir + "/*.npy")
+
     for image_file in image_files:      
-      img = cv2.imread(image_file)
+      basename = os.path.basename(image_file)
+      # 2026/09/05 Added the following line
+      if basename.endswith(".npy"):
+        img = np.load(image_file)
+      else:
+        img = cv2.imread(image_file)
       predicted_rgb_mask = self.predict(img)
 
       #predicted_rgb_mask = self.predict(image_file)
       basename = os.path.basename(image_file)
       #2025/06/10
+      output_filename = basename
       if basename.endswith(".jpg"):
-        basename = basename.replace(".jpg", ".png")
-      output_filepath = os.path.join(self.mini_test_output_dir, basename)
-      basename = os.path.basename(image_file)
+        output_filename = basename.replace(".jpg", ".png")
+      # 2026/09/05 Added the following two lines.
+      elif basename.endswith(".npy"):
+        output_filename = basename.replace(".npy", ".png")
+
+      output_filepath = os.path.join(self.mini_test_output_dir, output_filename)
+      #basename = os.path.basename(image_file)
     
       predicted_rgb_mask.save(output_filepath)
       print("=== Saved prediction {}".format(output_filepath))
-
- 
-  # 2026/06.05 Updated
+      #2026/09/05 Added the following line to write a slice in NPY
+      if basename.endswith(".npy"):
+        n = self.mini_test_npy_slice_index
+        h, w, num = img.shape
+        if n <num:
+          slice = img[:,:,n] 
+          output_filepath = os.path.join(self.mini_test_npy_slices_dir, output_filename)
+          cv2.imwrite(output_filepath, slice)
+          print("=== Saved NPY {} slice {}".format(n, output_filepath))
+        else:
+          print("Error invalid NPY slice index", n)
+  # 2026/04/16
   def normalize(self, image):
-    min, max = image.min(), image.max()
-    if max > min:
-        image = (image - min) / (max - min) * 255.0
-    else:
-        image = image * 0
-
-    image = image.astype("uint8")
+    min = np.min(image)/255.0
+    max = np.max(image)/255.0
+    scale = (max - min)
+    if scale == 0:
+      scale +=  1
+    image = (image -min) / scale
+    image = image.astype('uint8') 
     return image
-
-  def get_volume(self, volume_file):
-    volume   = None
-    basename = os.path.basename(volume_file)
-    if basename.endswith(".nii") or basename.endswith(".nii.gz"):
-      data   = nib.load(volume_file)
-      volume = data.get_fdata()
-    elif basename.endswith(".mha"):
-      data   = sitk.ReadImage(volume_file)
-      volume = sitk.GetArrayFromImage(data)
-    # 2026/06/03 
-    elif basename.endswith(".npy"):
-      volume   = np.load(volume_file)
-    elif basename.endswith(".h5"):
-      h5f = h5py.File(volume_file, 'r')
-      volume = h5f['image'][:]
-    else:
-      print("Unsupported volume file")
-    return volume
-
-  # 2026/05/14 Generate a maskoverly from an image_file and the corresponding mask file.
-  def generate_maskoverkay(self, image_filepath, mask_filepath):
-    if os.path.exists(image_filepath) and os.path.exists(mask_filepath):
-      image = cv2.imread(image_filepath)
-
-      mask  = cv2.imread(mask_filepath)
-      gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-      _, bin_mask = cv2.threshold(gray_mask, 0, 255, cv2.THRESH_BINARY)
-         
-      image[bin_mask==255] = (0,0,0)
-      mask_overlay = image + mask
-
-      return mask_overlay
-    else:
-      raise Exception("Not found an image or mask file")
-      
-
+  
   def get_num_slices(self, shape):
     num = 0
     if self.slice_shape_order =="hwd":
@@ -451,8 +452,6 @@ class TensorFlowFlexModel:
       slice = fdata[:,:,i]
     elif self.slice_shape_order == "dhw":
       slice = fdata[i,:,:]
-    #2026/05/07
-    #slice = slice.astype('uint8') 
     return slice
   
   def infer3d(self):
@@ -464,14 +463,9 @@ class TensorFlowFlexModel:
     if os.path.exists(self.mini_test_3d_output_dir):
       shutil.rmtree(self.mini_test_3d_output_dir)
     os.makedirs(self.mini_test_3d_output_dir)
-    #2026/05/07 Added the following line.
-    self.slice_normalize = self.config.get(ConfigParser.INFER3D, "slice_normalize", dvalue=True)
 
-    self.slice_resize    = self.config.get(ConfigParser.INFER3D, "slice_resize", dvalue=(512,512)) 
-
-    self.slice_rotation  = self.config.get(ConfigParser.INFER3D, "slice_rotation", dvalue="cv2.ROTATE_90_CLOCKWISE")
-    if self.slice_rotation !=None:
-       self.slice_rotation = eval(self.slice_rotation )
+    self.slice_resize   = self.config.get(ConfigParser.INFER3D, "slice_resize", dvalue=(512,512)) 
+    self.slice_rotation = self.config.get(ConfigParser.INFER3D, "slice_rotation", dvalue=cv2.ROTATE_90_CLOCKWISE) 
     self.slice_shape_order = self.config.get(ConfigParser.INFER3D, "slice_shape_order", dvalue="hwd")
     
     self.mask_overly   = self.config.get(ConfigParser.INFER3D, "mask_overlay", dvalue=True)
@@ -482,25 +476,18 @@ class TensorFlowFlexModel:
     if os.path.exists(self.mini_test_3d_output_dir):
       shutil.rmtree(self.mini_test_3d_output_dir)
 
-    volume_files    = glob.glob(self.mini_test_3d_dir + "/*.nii")
-    volume_files  +=  glob.glob(self.mini_test_3d_dir + "/*.nii.gz")
-    volume_files  +=  glob.glob(self.mini_test_3d_dir + "/*.mha")
-    # 2026/06/03 Added to support NPY files.
-    volume_files  +=  glob.glob(self.mini_test_3d_dir + "/*.npy")
+    nii_files    = glob.glob(self.mini_test_3d_dir + "/*.nii")
+    nii_files  +=  glob.glob(self.mini_test_3d_dir + "/*.nii.gz")
 
-    # 2026/06/10 Added to support H5 files.
-    volume_files  +=  glob.glob(self.mini_test_3d_dir + "/*.h5")
-
-    for volume_file in volume_files:
-      volume = self.get_volume(volume_file)
-
-      #2026/05/07
-      #self.slice_rotation =  cv2.ROTATE_90_CLOCKWISE
-      shape = volume.shape
+    for nii_file in nii_files:
+      data   = nib.load(nii_file)
+      fdata  = data.get_fdata()
+      self.slice_rotation =  cv2.ROTATE_90_CLOCKWISE
+      shape = fdata.shape
       if len(shape) == 4:
          raise Exception("Unsupported a nii image shape {}".format(shape))
       
-      basename = os.path.basename(volume_file)
+      basename = os.path.basename(nii_file)
 
       output_3d_base_dir = os.path.join(self.mini_test_3d_output_dir, basename)
       os.makedirs(output_3d_base_dir)
@@ -518,13 +505,11 @@ class TensorFlowFlexModel:
         num = self.get_num_slices(shape)
         
         for i in range(num):
-          #Get slice from 3d volume
-          slice = self.get_slice(volume, i)
-          # 2026/05/07 
-          if self.slice_normalize:
-            slice = self.normalize(slice)
+          #Get slice from fdata
+          slice = self.get_slice(fdata, i)
+          slice = self.normalize(slice)
    
-          if self.slice_rotation != None: #in [cv2.ROTATE_180, cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
+          if self.slice_rotation !=None:
             slice = cv2.rotate(slice, self.slice_rotation)
 
           if self.slice_resize != None:
@@ -537,8 +522,7 @@ class TensorFlowFlexModel:
           
           cv2.imwrite(slice_filepath, slice)
           print("Saved slice {}".format(slice_filepath))
-          slice = cv2.imread(slice_filepath)
-          #slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2RGB)
+          
           mask_filepath = os.path.join(output_masks_dir, slice_filename)
           predicted_rgb_mask =self.predict(slice)
           
@@ -549,14 +533,13 @@ class TensorFlowFlexModel:
           gray_mask = cv2.cvtColor(cv_mask, cv2.COLOR_BGR2GRAY)
           _, bin_mask = cv2.threshold(gray_mask, 0, 255, cv2.THRESH_BINARY)
          
-          #slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
+          slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
           slice[bin_mask==255] = (0,0,0)
      
           # Create a mask-overlay image from the slice and mask
           # dst = img * alpha + mask * beta + gamma
           #mask_overlay = cv2.addWeighted(slice, self.overlay_alpha, mask, self.overlay_beta, self.overlay_gamma)
           mask_overlay = slice + cv_mask
-    
           overlay_filepath = os.path.join(output_overlays_dir, slice_filename)
           cv2.imwrite(overlay_filepath, mask_overlay)
           print("=== Saved overlay {}".format(mask_filepath))
@@ -579,8 +562,10 @@ class TensorFlowFlexModel:
       shape = img.shape
       h     = shape[0]
       w     = shape[1]
-      if self.color_order == "RGB":
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+      # 2026/09/05 Added the following line
+      if self.file_format != "NPY":
+        if self.color_order == "RGB":
+          img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
       img = cv2.resize(img, (self.image_width, self.image_height))
 
       img = np.expand_dims(img, axis=0)

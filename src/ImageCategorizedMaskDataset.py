@@ -63,6 +63,8 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
     image_files  = glob.glob(images_dir + "/*.jpg")
     image_files += glob.glob(images_dir + "/*.png")
     image_files += glob.glob(images_dir + "/*.tif")
+    #2026/09/05
+    image_files += glob.glob(images_dir + "/*.npy")
 
     #print(image_files)
     num_images = len(image_files)
@@ -90,10 +92,16 @@ class ImageCategorizedMaskDataset(ImageMaskDataset):
     Y = np.zeros((num_images, self.image_height, self.image_width, self.num_classes, ), 
                  dtype=self.mask_dtype)
 
-    for n, image_file in enumerate(image_files):  
-      img = cv2.imread(image_file)  
-      if self.color_order == "RGB":
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+    for n, image_file in enumerate(image_files):
+      # 2026/09/05
+      if image_file.endswith(".npy"):
+        img = np.load(image_file)
+        #print("npy file ", img.shape)
+
+      else:
+        img = cv2.imread(image_file)  
+        if self.color_order == "RGB":
+          img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
       img = cv2.resize(img, (self.image_width, self.image_height))
       X[n] = img
 

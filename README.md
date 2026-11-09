@@ -1,4 +1,4 @@
-<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/06/13)</h2>
+<h2>TensorFlow-FlexUNet-Image-Segmentation-Model (Updated: 2026/11/09)</h2>
 <b>Toshiyuki Arai</b><br>
 <b>Software Laboratory antillia.com</b><br>
 <ul>
@@ -62,6 +62,19 @@ to run TensorFlowFlexUNet3DInferencer.py.
 </li>
 <li>
 2026/06/10:Updated infer3d method to support H5 3D volume inference.
+</li>
+<!-- 2026/11/09 -->
+<li>
+2026/09/23: Added  CategoricalFocalDiceLoss class to focal_dice_loss.py.
+</li>
+<li>
+2026/09/25: Added DiceCoefHybrid class adn dice_coef_hybrid function to dice_coef_multiclass.py.
+</li>
+<li>
+2026/09/23: Modified dice_loss_multiclass to import dice_coef_foreground, dice_loss_foreground in TenssorFlowFlexModel.py
+</li>
+<li>
+2026/09/23: Modified to import a custom loss function CategoricalFocalDiceLoss in TenssorFlowFlexModel.py.
 </li>
 </ul>
 <h2>

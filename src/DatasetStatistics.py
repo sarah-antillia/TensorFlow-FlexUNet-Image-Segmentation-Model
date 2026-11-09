@@ -46,6 +46,8 @@ class DatasetStatistics:
         if subsub_dir == "images":
           files  = glob.glob(fullpath + "/*.jpg")
           files += glob.glob(fullpath + "/*.png")
+          files += glob.glob(fullpath + "/*.npy")
+
           count  = len(files)
           self.y.append(count)
 

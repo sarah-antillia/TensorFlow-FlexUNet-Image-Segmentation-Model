@@ -14,8 +14,15 @@
 #
 # TensorFlowFlexModel.py
 
-# 2025/06/05 T.Arai
+# 2025/06/05 Initial version.
 # 2025/06/15 Modified to support an online augmentation.
+# 2025/09/08 Modified to resize the PIL predicted_rgb_mask to the original image size in predict method.
+# 2025/09/15 Modified to remove mini_test_output_dir if it exists, and to recreate the directory.
+
+# 2026/04/16 Addded infer3d method to support 3d volume inference.
+# 2026/04/27 Updated the infer3d method to index output filenames starting from 10001.
+# 2026/09/23 Modified dice_loss_multiclass to import dice_coef_bg_excluded, dice_loss_bg_excluded
+# 2026/09/23 Modified to import a custom loss function CategoricalFocalDiceLoss.
 
 import os
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
@@ -31,17 +38,28 @@ from tensorflow.keras import layers
 import numpy as np
 import matplotlib.pyplot as plt
 from  tensorflow.keras.losses import SparseCategoricalCrossentropy
+
 from  tensorflow.keras.metrics import SparseCategoricalAccuracy 
 
 from EpochChangeCallback import EpochChangeCallback
 from EpochChangeInferencer import EpochChangeInferencer
+from EpochChangeTiledInferencer import EpochChangeTiledInferencer
+
 from ImageCategorizedMaskDataset import ImageCategorizedMaskDataset
 from ImageCategorizedMaskDatasetGenerator import ImageCategorizedMaskDatasetGenerator
 
 from dice_coef_multiclass import dice_coef_multiclass, dice_loss_multiclass
+
+# 2026/09/23 Added the following line.
+from dice_coef_multiclass import dice_coef_bg_excluded, dice_loss_bg_excluded
+
+# 2026/09/23 Added the following line to support a custom loss function deriveed from tf.keras.losses.Loss
+from focal_dice_loss import CategoricalFocalDiceLoss
 import json
 import traceback
 from PIL import Image
+
+import nibabel as  nib
 
 from ConfigParser import ConfigParser
 
@@ -58,18 +76,16 @@ class TensorFlowFlexModel:
     self.config_file    = config_file
     self.config         = ConfigParser(config_file)
     self.seed           = self.SEED
-    self.verbose        = self.config.get(ConfigParser.DEBUG, "verbose")
+    self.verbose        = self.config.get(ConfigParser.DEBUG, "verbose", dvalue=False)
     self.image_height   = self.config.get(ConfigParser.MODEL, "image_height")
     self.image_width    = self.config.get(ConfigParser.MODEL, "image_width")
     self.image_channels = self.config.get(ConfigParser.MODEL, "image_channels")
+    self.split_size     = self.config.get(ConfigParser.TILEDINFER, "split_size", dvalue=512)
+    self.overlappging   = self.config.get(ConfigParser.TILEDINFER, "overlapping", dvalue=64)
 
     self.num_classes    = self.config.get(ConfigParser.MODEL, "num_classes")
     self.color_order    = self.config.get(ConfigParser.IMAGE,  "color_order", dvalue="RGB")
     
-    self.num_layers     = self.config.get(ConfigParser.MODEL, "num_layers", dvalue=6)
-    self.base_filters   = self.config.get(ConfigParser.MODEL,  "base_filters", dvalue=16)
-    
-
     #Multi-class NumPy NPZ (multi-class categorized mask file format) 
     numpy_npz = ".npz"
     self.mask_file_format = self.config.get(ConfigParser.MASK,  "mask_file_format", dvalue=numpy_npz)
@@ -88,13 +104,13 @@ class TensorFlowFlexModel:
     self.dataset = Dataset(config_file, verbose=self.verbose)
     print("--- Dataset class {}".format(self.dataset))
 
+    """
     self.mini_test_dir    = self.config.get(ConfigParser.INFER, "images_dir")
-
-    self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir")
-
+    self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir") 
     if os.path.exists(self.mini_test_output_dir):
       shutil.rmtree(self.mini_test_output_dir)
     os.makedirs(self.mini_test_output_dir)
+    """
 
     # 205/06/07
     # Default mask_datatype = "categorized",   mask_file_format = ".npz"
@@ -115,8 +131,8 @@ class TensorFlowFlexModel:
     self.rev_rgb_map = {v: k for k, v in self.rgb_map.items()} 
 
     model_dir       = self.config.get(ConfigParser.TRAIN, "model_dir", dvalue="./models")
-    if not os.path.exists(model_dir):
-      os.makedirs(model_dir)
+    #if not os.path.exists(model_dir):
+    #  os.makedirs(model_dir)
 
     self.weight_filepath = os.path.join(model_dir, self.BEST_MODEL_FILE)
 
@@ -161,14 +177,17 @@ class TensorFlowFlexModel:
 
     # Specify a list of metrics name, which can be used to compile a UNet model. 
     metrics  = self.config.get(ConfigParser.MODEL, "metrics", dvalue=["dice_coef_multiclass"])
-   
+    print("Metrics ", metrics)
     self.metrics = []
     for metric in metrics:
       m = eval(metric)
       self.metrics.append(m)
 
     self.loss = self.config.get(ConfigParser.MODEL, "loss", dvalue="categorical_crossentropy") 
-
+    # 2026/09/23 To enable the CategoricalFocalDiceLoss 
+    if self.loss == "categorical_focal_dice_loss":
+      self.loss = CategoricalFocalDiceLoss()
+    print("Loss function ", self.loss)
     self.model.compile(optimizer = self.optimizer,
               loss    = self.loss,
               metrics = self.metrics)
@@ -195,8 +214,17 @@ class TensorFlowFlexModel:
   
     eval_dir = self.config.get(ConfigParser.EVAL, "eval_dir", dvalue="./eval")
 
-    epoch_change_inferencer   = EpochChangeInferencer(self, self.config_file)
-    callbacks.append(epoch_change_inferencer)
+    #2025/10/01 Modified
+    enabled_inferencer = self.config.get(ConfigParser.TRAIN, "epoch_change_infer", dvalue=True)
+    if enabled_inferencer: 
+      epoch_change_inferencer   = EpochChangeInferencer(self, self.config_file)
+      callbacks.append(epoch_change_inferencer)
+
+    #2025/10/01 Added
+    enabled_tiled_inferencer = self.config.get(ConfigParser.TRAIN, "epoch_change_tiled_infer", dvalue=False)
+    if enabled_tiled_inferencer:
+      epoch_change_tiled_inferencer   = EpochChangeTiledInferencer(self, self.config_file)  
+      callbacks.append(epoch_change_tiled_inferencer)
 
     epoch_change_callback   = EpochChangeCallback(eval_dir, self.train_metrics)
     callbacks.append(epoch_change_callback)
@@ -214,10 +242,20 @@ class TensorFlowFlexModel:
 
   def train(self):
     print("==== Started TensorFlowFlexModel.train")  
+
+    #2025/09/15 Remove model_dir if it exists, and recreate the directory
+    model_dir    = self.config.get(ConfigParser.TRAIN, "model_dir", dvalue="./models")
+    if os.path.exists(model_dir):
+      shutil.rmtree(model_dir)
+    os.makedirs(model_dir)
+    # 2025/09/15 Added the following line.
+    shutil.copy2(self.config_file, model_dir)
+    print("=== Copied {} to {}".format(self.config_file, model_dir))
+
     eval_dir       = self.config.get(ConfigParser.TRAIN, "eval_dir", dvalue="./eval")
-    #
-    if not os.path.exists(eval_dir):
-      os.makedirs(eval_dir)
+    if os.path.exists(eval_dir):
+      shutil.rmtree(eval_dir)
+    os.makedirs(eval_dir)
 
     self.callbacks = self.create_callbacks()
     self.batch_size = self.config.get(ConfigParser.TRAIN, "batch_size", dvalue=4)
@@ -259,7 +297,7 @@ class TensorFlowFlexModel:
   # 2025/06/15
   def train_by_generator(self, train_generator, valid_generator):
     print("=== Start train_by_generator")
-    print("--- Use the train and valid generator to fit.")
+    print("--- Use the train and valid gnerators to fit.")
     # train and valid dataset will be used by train_generator and valid_generator respectively
     steps_per_epoch  = self.config.get(ConfigParser.TRAIN, "steps_per_epoch",  dvalue=400)
     validation_steps = self.config.get(ConfigParser.TRAIN, "validation_steps", dvalue=800)
@@ -316,14 +354,25 @@ class TensorFlowFlexModel:
 
   def infer(self):
     self.load_model()
+    
+    # 2025/10/02 Moved here.
+    self.mini_test_dir        = self.config.get(ConfigParser.INFER, "images_dir")
+    self.mini_test_output_dir = self.config.get(ConfigParser.INFER, "output_dir")
+     
+    if os.path.exists(self.mini_test_output_dir):
+      shutil.rmtree(self.mini_test_output_dir)
+    os.makedirs(self.mini_test_output_dir)
 
     image_files  = glob.glob(self.mini_test_dir + "/*.png")
     image_files += glob.glob(self.mini_test_dir + "/*.jpg")
     image_files += glob.glob(self.mini_test_dir + "/*.tif")
     image_files += glob.glob(self.mini_test_dir + "/*.bmp")
+ 
+    for image_file in image_files:      
+      img = cv2.imread(image_file)
+      predicted_rgb_mask = self.predict(img)
 
-    for image_file in image_files:
-      predicted_rgb_mask = self.predict(image_file)
+      #predicted_rgb_mask = self.predict(image_file)
       basename = os.path.basename(image_file)
       #2025/06/10
       if basename.endswith(".jpg"):
@@ -334,9 +383,141 @@ class TensorFlowFlexModel:
       predicted_rgb_mask.save(output_filepath)
       print("=== Saved prediction {}".format(output_filepath))
 
+  # 2026/04/16
+  def normalize(self, image):
+    min = np.min(image)/255.0
+    max = np.max(image)/255.0
+    scale = (max - min)
+    if scale == 0:
+      scale +=  1
+    image = (image -min) / scale
+    image = image.astype('uint8') 
+    return image
+  
+  def get_num_slices(self, shape):
+    num = 0
+    if self.slice_shape_order =="hwd":
+      h, w, num = shape
+    elif self.slice_shape_order =="dhw":
+      num, h, w, = shape
+    return num
 
-  def predict(self, image_file):
-      img = cv2.imread(image_file)
+  def get_slice(self, fdata, i):
+    slice = None
+    if self.slice_shape_order == "hwd":
+      slice = fdata[:,:,i]
+    elif self.slice_shape_order == "dhw":
+      slice = fdata[i,:,:]
+    return slice
+  
+  def infer3d(self):
+    self.load_model()
+    
+    self.mini_test_3d_dir        = self.config.get(ConfigParser.INFER3D, "images_dir")
+    self.mini_test_3d_output_dir = self.config.get(ConfigParser.INFER3D, "output_dir")
+     
+    if os.path.exists(self.mini_test_3d_output_dir):
+      shutil.rmtree(self.mini_test_3d_output_dir)
+    os.makedirs(self.mini_test_3d_output_dir)
+
+    self.slice_resize   = self.config.get(ConfigParser.INFER3D, "slice_resize", dvalue=(512,512)) 
+    self.slice_rotation = self.config.get(ConfigParser.INFER3D, "slice_rotation", dvalue=cv2.ROTATE_90_CLOCKWISE) 
+    self.slice_shape_order = self.config.get(ConfigParser.INFER3D, "slice_shape_order", dvalue="hwd")
+    
+    self.mask_overly   = self.config.get(ConfigParser.INFER3D, "mask_overlay", dvalue=True)
+    self.overlay_alpha = self.config.get(ConfigParser.INFER3D, "overlay_alpha", dvalue=0.5)
+    self.overlay_beta  = self.config.get(ConfigParser.INFER3D, "overlay_beta", dvalue=0.5)
+    self.overlay_gamma = self.config.get(ConfigParser.INFER3D, "overlay_gamma", dvalue=0)
+
+    if os.path.exists(self.mini_test_3d_output_dir):
+      shutil.rmtree(self.mini_test_3d_output_dir)
+
+    nii_files    = glob.glob(self.mini_test_3d_dir + "/*.nii")
+    nii_files  +=  glob.glob(self.mini_test_3d_dir + "/*.nii.gz")
+
+    for nii_file in nii_files:
+      data   = nib.load(nii_file)
+      fdata  = data.get_fdata()
+      self.slice_rotation =  cv2.ROTATE_90_CLOCKWISE
+      shape = fdata.shape
+      if len(shape) == 4:
+         raise Exception("Unsupported a nii image shape {}".format(shape))
+      
+      basename = os.path.basename(nii_file)
+
+      output_3d_base_dir = os.path.join(self.mini_test_3d_output_dir, basename)
+      os.makedirs(output_3d_base_dir)
+
+      output_slices_dir   = os.path.join(output_3d_base_dir, "slices")    # image
+      output_masks_dir    = os.path.join(output_3d_base_dir, "masks")     # prediction
+      output_overlays_dir = os.path.join(output_3d_base_dir, "overlays")  # overlay
+
+      os.makedirs(output_slices_dir)
+      os.makedirs(output_masks_dir)
+      os.makedirs(output_overlays_dir)
+      #2026/04/27
+      index = 10001
+      if len(shape) == 3:
+        num = self.get_num_slices(shape)
+        
+        for i in range(num):
+          #Get slice from fdata
+          slice = self.get_slice(fdata, i)
+          slice = self.normalize(slice)
+   
+          if self.slice_rotation !=None:
+            slice = cv2.rotate(slice, self.slice_rotation)
+
+          if self.slice_resize != None:
+            slice = cv2.resize(slice, self.slice_resize)
+          #2026/04/27
+          #slice_filename = str(i+1) + ".png"
+          slice_filename = str(index+i) + ".png"
+
+          slice_filepath = os.path.join(output_slices_dir, slice_filename)
+          
+          cv2.imwrite(slice_filepath, slice)
+          print("Saved slice {}".format(slice_filepath))
+          
+          mask_filepath = os.path.join(output_masks_dir, slice_filename)
+          predicted_rgb_mask =self.predict(slice)
+          
+          predicted_rgb_mask.save(mask_filepath)
+          print("=== Saved prediction {}".format(mask_filepath))
+          cv_mask   = cv2.imread(mask_filepath)
+
+          gray_mask = cv2.cvtColor(cv_mask, cv2.COLOR_BGR2GRAY)
+          _, bin_mask = cv2.threshold(gray_mask, 0, 255, cv2.THRESH_BINARY)
+         
+          slice = cv2.cvtColor(slice, cv2.COLOR_GRAY2BGR)
+          slice[bin_mask==255] = (0,0,0)
+     
+          # Create a mask-overlay image from the slice and mask
+          # dst = img * alpha + mask * beta + gamma
+          #mask_overlay = cv2.addWeighted(slice, self.overlay_alpha, mask, self.overlay_beta, self.overlay_gamma)
+          mask_overlay = slice + cv_mask
+          overlay_filepath = os.path.join(output_overlays_dir, slice_filename)
+          cv2.imwrite(overlay_filepath, mask_overlay)
+          print("=== Saved overlay {}".format(mask_filepath))
+  
+  def pil2cv(self, image):
+    new_image = np.array(image, dtype=np.uint8)
+    if new_image.ndim == 2: 
+        pass
+    elif new_image.shape[2] == 3: 
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+    elif new_image.shape[2] == 4: 
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
+    return new_image
+  
+  #2026/04/16
+  #def predict(self, image_file):
+  def predict(self, img):
+      #img = cv2.imread(image_file)
+      # 2025/09/08 Get a size of the image_file
+      shape = img.shape
+      h     = shape[0]
+      w     = shape[1]
       if self.color_order == "RGB":
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
       img = cv2.resize(img, (self.image_width, self.image_height))
@@ -346,6 +527,10 @@ class TensorFlowFlexModel:
       predicted_argmax = np.argmax(predicted, axis=-1)[0] 
  
       predicted_rgb_mask = self.convert_to_rgb(predicted_argmax)
+      # 2025/09/08 
+      #Resize the PIL predicted_rgb_mask to the original image size
+      predicted_rgb_mask = predicted_rgb_mask.resize((w, h))
+      #print("Resized predicted_rgb_mask w:{}, h:{}".format(w, h))
       return predicted_rgb_mask
   
   def convert_to_rgb(self, prediction_array):
@@ -369,8 +554,125 @@ class TensorFlowFlexModel:
       error = "Not found a weight_file " + self.weight_filepath
       raise Exception(error)
 
+  def tiled_infer(self):
+    self.load_model()
 
-def inspect(self, image_file='./model.png', summary_file="./summary.txt"):
+    self.tiled_infer_images_dir = self.config.get(ConfigParser.TILEDINFER, "images_dir")
+    self.tiled_infer_output_dir = self.config.get(ConfigParser.TILEDINFER, "output_dir")
+     
+    if os.path.exists(self.tiled_infer_output_dir):
+      shutil.rmtree(self.tiled_infer_output_dir)
+    os.makedirs(self.tiled_infer_output_dir)
+
+    image_files  = glob.glob(self.tiled_infer_images_dir + "/*.png")
+    image_files += glob.glob(self.tiled_infer_images_dir + "/*.jpg")
+    image_files += glob.glob(self.tiled_infer_images_dir + "/*.tif")
+    image_files += glob.glob(self.tiled_infer_images_dir + "/*.bmp")
+
+    for image_file in image_files:
+      predicted_rgb_mask = self.tiled_infer_file(image_file)
+
+      basename = os.path.basename(image_file)
+    
+      if basename.endswith(".jpg"):
+        basename = basename.replace(".jpg", ".png")
+      output_filepath = os.path.join(self.tiled_infer_output_dir, basename)
+      basename = os.path.basename(image_file)
+    
+      predicted_rgb_mask.save(output_filepath)
+      print("=== Saved prediction {}".format(output_filepath))
+        
+
+  def tiled_infer_file(self, image_file):
+      self.verbose = False
+
+      image   = Image.open(image_file)
+      image   = image.convert("RGB")
+  
+      #PIL image color_order = "rgb"
+      w, h    = image.size
+    
+      vert_split_num  = h // self.split_size
+      if h % self.split_size != 0:
+        vert_split_num += 1
+
+      horiz_split_num = w // self.split_size
+      if w % self.split_size != 0:
+        horiz_split_num += 1
+      self.bgcolor = (0, 0, 0)
+      background = Image.new("RGB", (w, h), self.bgcolor)
+
+      # Tiled image segmentation
+      for j in range(vert_split_num):
+        for i in range(horiz_split_num):
+          left  = self.split_size * i
+          upper = self.split_size * j
+          right = left  + self.split_size
+          lower = upper + self.split_size
+          
+          if left >=w or upper >=h:
+            continue 
+          
+          left_margin  = self.overlappging
+          upper_margin = self.overlappging
+          if left-self.overlappging <0:
+            left_margin = 0
+          if upper-self.overlappging <0:
+            upper_margin = 0
+
+          right_margin = self.overlappging
+          lower_margin = self.overlappging
+          if right + right_margin > w:
+            right_margin = 0
+          if lower + lower_margin > h:
+            lower_margin = 0
+
+          cropbox = (left  - left_margin,  upper - upper_margin, 
+                     right + right_margin, lower + lower_margin )
+
+          if self.verbose:
+            print("tiled_infer_file:: cropbox {}".format(cropbox))
+
+          # Crop a region specified by the cropbox from the whole image to create a tiled image segmentation.      
+          cropped = image.crop(cropbox)
+
+          # Get the size of the cropped image.
+          cw, ch  = cropped.size
+
+          # Resize the cropped image to the model image size (width, height) for a prediction.
+          cropped = cropped.resize((self.image_width, self.image_height))
+  
+          img = np.array(cropped, dtype=np.uint8)
+
+          img = np.expand_dims(img, axis=0)
+          predicted = self.model.predict(img)
+          predicted_argmax = np.argmax(predicted, axis=-1)[0] 
+ 
+          mask = self.convert_to_rgb(predicted_argmax)
+ 
+          # Resize the mask to the same size of the corresponding the cropped_size (cw, ch)
+          mask = mask.resize((cw, ch))
+        
+          right_position = left_margin + self.image_width
+          if right_position > cw:
+             right_position = cw
+
+          bottom_position = upper_margin + self.image_height
+          if bottom_position > ch:
+             bottom_position = ch
+
+          # Excluding margins of left, upper, right and bottom from the mask.           
+          mask         = mask.crop((left_margin, upper_margin, 
+                                  right_position, bottom_position)) 
+          
+          #iw, ih = mask.size
+          background.paste(mask, (left, upper))
+        
+      return background
+
+  
+  #2025/09/15 Corrected an indent of this function to be a method of this class.
+  def inspect(self, image_file='./model.png', summary_file="./summary.txt"):
     # Please download and install graphviz for your OS
     # https://www.graphviz.org/download/ 
     tf.keras.utils.plot_model(self.model, to_file=image_file, show_shapes=True)
@@ -390,7 +692,7 @@ if __name__ == "__main__":
     if not os.path.exists(config_file):
       raise Exception("No found " + config_file)
     model = TensorFlowFlexModel(config_file)
-
+    
   except:
     traceback.print_exc()
 
